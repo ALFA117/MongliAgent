@@ -6,13 +6,12 @@ import { planResearch } from './planner';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// URLs configurables por variable de entorno — Railway asigna una URL por servicio
+// Todo corre en el mismo servidor — llamamos a localhost en el mismo PORT
 function getServiceUrls(): Record<string, string> {
-  const searchBase = process.env.SERVICE_SEARCH_URL ?? 'http://localhost:3001';
-  const summaryBase = process.env.SERVICE_SUMMARY_URL ?? 'http://localhost:3002';
+  const base = `http://localhost:${process.env.PORT ?? 3000}`;
   return {
-    search: `${searchBase}/buscar`,
-    summarize: `${summaryBase}/resumir`,
+    search: `${base}/buscar`,
+    summarize: `${base}/resumir`,
   };
 }
 
