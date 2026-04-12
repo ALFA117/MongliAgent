@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // local only; Railway injects vars directly
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = process.env.PORT ?? 3000;
 
 // Validate critical env vars on startup
 const requiredEnv = ['STELLAR_SECRET_KEY', 'ANTHROPIC_API_KEY'];
@@ -99,4 +99,5 @@ app.get('/health', (_req, res) => {
 app.listen(PORT, () => {
   console.log(`[orchestrator] Running on :${PORT}`);
   console.log(`[orchestrator] Agent wallet: ${process.env.STELLAR_PUBLIC_KEY ?? '(not set)'}`);
+  console.log(`[orchestrator] Network: ${process.env.STELLAR_NETWORK ?? 'testnet'}`);
 });
