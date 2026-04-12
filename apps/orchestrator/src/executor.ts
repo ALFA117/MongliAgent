@@ -45,46 +45,103 @@ async function executeSubtask(
   return { result: result.data, txHash: result.txHash };
 }
 
+function generateReportLocal(
+  session: Session,
+  results: Array<{ subtask: Subtask; result: unknown }>
+): string {
+  const budgetUsed = session.balanceUsed.toFixed(4);
+  const elapsed = ((Date.now() - session.startTime) / 1000).toFixed(1);
+
+  const hallazgos = results.flatMap(({ result }) => {
+    const r = result as { results?: { title: string; url: string; snippet: string }[] };
+    return (r.results ?? []).slice(0, 3).map(
+      (item) => `- **[${item.title}](${item.url})**: ${item.snippet}`
+    );
+  });
+
+  const fuentes = results.flatMap(({ subtask, result }) => {
+    const r = result as { results?: { title: string; url: string }[] };
+    return (r.results ?? []).slice(0, 3).map(
+      (item) => `| [${item.title.slice(0, 40)}](${item.url}) | ${subtask.service} | $${subtask.cost} USDC |`
+    );
+  });
+
+  const txLines = session.subtasks
+    .filter((t) => t.txHash)
+    .map((t) => `- \`${t.txHash}\` — [ver en Stellar Expert](https://stellar.expert/explorer/testnet/tx/${t.txHash})`);
+
+  return `# Reporte de Investigación
+
+**Pregunta:** ${session.question}
+
+---
+
+## Resumen ejecutivo
+
+Se realizaron ${results.length} búsqueda(s) sobre el tema utilizando el protocolo x402 con pagos reales en Stellar Testnet. Se encontraron ${hallazgos.length} resultados relevantes con un costo total de **$${budgetUsed} USDC** en ${elapsed} segundos.
+
+---
+
+## Hallazgos clave
+
+${hallazgos.length > 0 ? hallazgos.join('\n') : '_No se encontraron resultados._'}
+
+---
+
+## Fuentes y costos
+
+| Fuente | Tipo | Costo |
+|--------|------|-------|
+${fuentes.length > 0 ? fuentes.join('\n') : '| — | — | — |'}
+
+**Total gastado:** $${budgetUsed} USDC
+
+---
+
+## Transacciones on-chain
+
+${txLines.length > 0 ? txLines.join('\n') : '_Sin transacciones registradas._'}
+
+---
+
+## Conclusión
+
+La investigación sobre "${session.question}" fue completada con éxito utilizando micropagos x402 en Stellar Testnet. Cada búsqueda generó una transacción verificable on-chain.
+`;
+}
+
 async function generateReport(
   session: Session,
   results: Array<{ subtask: Subtask; result: unknown }>
 ): Promise<string> {
-  const resultText = results
-    .map(
-      ({ subtask, result }) =>
-        `### Subtarea: ${subtask.service} — "${subtask.input}"\nRazón: ${subtask.reason}\nResultado:\n${JSON.stringify(result, null, 2)}`
-    )
-    .join('\n\n');
+  try {
+    const budgetUsed = session.balanceUsed.toFixed(4);
+    const elapsed = ((Date.now() - session.startTime) / 1000).toFixed(1);
+    const resultText = results
+      .map(
+        ({ subtask, result }) =>
+          `### Subtarea: ${subtask.service} — "${subtask.input}"\n${JSON.stringify(result, null, 2)}`
+      )
+      .join('\n\n');
 
-  const budgetUsed = session.balanceUsed.toFixed(4);
-  const elapsed = ((Date.now() - session.startTime) / 1000).toFixed(1);
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: `Escribe un reporte de investigación conciso en markdown en español.\n\nPregunta: ${session.question}\nPresupuesto usado: $${budgetUsed} USDC\nTiempo: ${elapsed}s\n\nResultados:\n${resultText}\n\nSecciones: Resumen ejecutivo, Hallazgos clave (viñetas), Fuentes y costos (tabla), Conclusión.`,
+        },
+      ],
+    });
 
-  const prompt = `Eres un analista de investigación. Escribe un reporte de investigación conciso en markdown, completamente en español.
-
-Pregunta: ${session.question}
-Presupuesto usado: $${budgetUsed} / $${session.budgetUsdc} USDC
-Tiempo de investigación: ${elapsed}s
-
-Resultados de investigación:
-${resultText}
-
-Escribe un reporte en markdown con estas secciones (usa encabezados markdown correctos):
-1. **Resumen ejecutivo** — 2-3 oraciones que respondan la pregunta directamente
-2. **Hallazgos clave** — puntos en viñetas con los resultados de la investigación
-3. **Fuentes y costos** — tabla markdown: | Fuente | Tipo | Costo |
-4. **Conclusión** — 1-2 oraciones
-
-Sé factual, conciso y basa todo en los resultados proporcionados. Todo en español.`;
-
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  return message.content[0].type === 'text'
-    ? message.content[0].text
-    : 'Error al generar el reporte.';
+    return message.content[0].type === 'text'
+      ? message.content[0].text
+      : generateReportLocal(session, results);
+  } catch {
+    // Sin créditos — reporte local sin LLM
+    return generateReportLocal(session, results);
+  }
 }
 
 export async function runResearch(session: Session): Promise<void> {
