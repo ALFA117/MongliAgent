@@ -1,173 +1,168 @@
 # Pendientes — MongliAgent Hackathon
 
-**Fecha límite:** 13 de abril 2026 · **Hoy:** 12 de abril · **Quedan ~24 horas**
+**Fecha límite:** 13 de abril 2026 · **Última actualización:** 12 de abril ~2:30 AM
 
 ---
 
-## Estado general
+## Estado actual (al terminar la sesión del 12 de abril)
 
 | Ítem | Estado |
 |---|---|
-| Wallet Stellar Testnet | Parcial |
-| Orchestrator deployado | **Falta (bloqueante)** |
-| Servicio de búsqueda (service-search) | Falta |
-| Servicio de resumen (service-summary) | Falta |
-| Pagos x402 reales en Testnet | Falta (obligatorio) |
-| UI traducida al español | Pendiente |
-| Live feed conectado al orchestrator real | Pendiente |
+| Orchestrator deployado en Railway | ✅ Hecho — `https://mongliagent-production.up.railway.app` |
+| UI en español con logo e Instagram | ✅ Hecho |
+| UI conectada a Railway (VITE_ORCHESTRATOR_URL) | ✅ Hecho |
+| Live feed con polling cada 2s | ✅ Hecho |
+| Planner sin Claude API (fallback gratuito) | ✅ Hecho |
+| Reporte sin Claude API (generado localmente) | ✅ Hecho |
+| Resumen sin Claude API (extracción local) | ✅ Hecho |
+| Wallet Stellar — fondear con XLM y USDC testnet | ⚠️ PENDIENTE |
+| Pagos x402 reales ejecutándose | ⚠️ PENDIENTE (bloqueado por wallet) |
+| Wallet connect — login de usuario con su propia wallet | ⚠️ PENDIENTE |
+| README actualizado | ⚠️ PENDIENTE |
+| Video demo grabado | ⚠️ PENDIENTE |
 
 ---
 
-## Detalle por ítem
+## Lo que falta mañana (en orden de prioridad)
 
-### Parcial — Wallet Stellar Testnet
-La wallet debe estar generada y fondeada con XLM y USDC de testnet.
-Confirmar que tenga saldo real antes de continuar.
+### 1. CRÍTICO — Fondear la wallet del agente en Testnet
 
----
+La wallet `STELLAR_PUBLIC_KEY` que está en Railway necesita tener saldo
+de XLM y USDC en testnet para que el agente pueda pagar los servicios.
 
-### Falta — Orchestrator deployado *(bloqueante)*
-La UI llama a `/api/research` y recibe 404 porque el servidor Express
-no existe en Vercel. Hay que deployarlo en Railway. Sin esto nada funciona.
+**Pasos para fondear:**
+1. Ve a https://laboratory.stellar.org/account/create
+2. Pega tu `STELLAR_PUBLIC_KEY`
+3. Haz clic en "Create account" — el friendbot te da 10,000 XLM de testnet
+4. Para conseguir USDC testnet:
+   - Ve a https://stellar.expert/explorer/testnet
+   - O usa el faucet de Circle en testnet
+   - O crea un trustline manualmente con la herramienta de laboratorio
 
----
-
-### Falta — Servicio de búsqueda (service-search)
-- Puerto 3001
-- Endpoint `POST /buscar`
-- Cobra 0.01 USDC por consulta vía x402
-- Usa Brave Search o SerpAPI para resultados reales
-- Este es el servicio más importante del demo
+**Sin fondos en la wallet, los pagos x402 fallan silenciosamente.**
 
 ---
 
-### Falta — Servicio de resumen (service-summary)
-- Puerto 3002
-- Endpoint `POST /resumir`
-- Cobra 0.02 USDC por llamada vía x402
-- Usa la Claude API para resumir texto
-- Demuestra que hasta la IA se paga por uso
+### 2. CRÍTICO — Verificar que los pagos x402 funcionan end-to-end
+
+Después de fondear la wallet, hacer una prueba completa:
+1. Abrir la UI
+2. Escribir una pregunta
+3. Darle a Investigar
+4. Confirmar que aparece al menos un hash de transacción en el feed
+5. Hacer clic en el hash y verificarlo en https://stellar.expert/explorer/testnet
+
+Si esto funciona, el proyecto califica para el hackathon.
 
 ---
 
-### Falta — Pagos x402 reales en Testnet *(obligatorio para el hackathon)*
-El hackathon exige transacciones reales en Stellar Testnet o Mainnet.
-Sin hashes de transacción verificables en el explorador, el proyecto no califica.
-Actualmente hay 0 transacciones procesadas.
+### 3. IMPORTANTE — Wallet Connect para usuarios
+
+El usuario quiere que el visitante pueda **conectar su propia wallet de Stellar**
+y pagar los servicios con sus propios fondos en lugar de la wallet del agente.
+
+**Qué implica:**
+- Integrar Freighter Wallet (extensión de Chrome para Stellar)
+- El usuario conecta su wallet en la UI
+- El pago x402 se firma con la wallet del usuario, no con el secret key del servidor
+- La clave privada del usuario nunca toca el servidor
+
+**Archivos a modificar:**
+- `apps/ui/src/App.tsx` — agregar botón "Conectar Wallet"
+- `apps/ui/src/components/WalletConnect.tsx` — nuevo componente
+- `apps/ui/package.json` — agregar `@stellar/freighter-api`
+- `apps/orchestrator/src/stellar/payAndFetch.ts` — soporte para firma en el cliente
+
+**Dependencia npm:**
+```
+@stellar/freighter-api
+```
+
+**Flujo:**
+1. Usuario hace clic en "Conectar Wallet"
+2. Freighter pide permiso
+3. UI obtiene la public key del usuario
+4. Cuando el agente necesita pagar, manda la transacción sin firmar al frontend
+5. Freighter la firma y la envía
+6. El hash vuelve al servidor para el reintento con X-Payment
+
+⚠️ Esto requiere rediseño del payAndFetch para modo cliente.
+Alternativa más simple: el servidor mantiene la wallet pero muestra
+la public key del usuario como "identidad".
 
 ---
 
-### Pendiente — UI traducida al español
-Todos los textos de la interfaz deben estar en español: etiquetas,
-mensajes del live feed, botones, reporte final y errores.
+### 4. PENDIENTE — README actualizado
+
+El README actual está incompleto. Debe incluir:
+- Qué es MongliAgent (descripción corta)
+- Cómo funciona (flujo x402 explicado)
+- Cómo instalarlo localmente (variables de entorno, npm install, etc.)
+- Variables de entorno requeridas
+- URLs de producción (Railway + Vercel)
+- Screenshot o GIF del demo
 
 ---
 
-### Pendiente — Live feed conectado al orchestrator real
-Actualmente el feed está vacío. Cuando el orchestrator esté deployado,
-la UI debe hacer polling a `/estado/:sessionId` cada 2 segundos y mostrar
-cada pago en tiempo real.
+### 5. PENDIENTE — Video demo (2-3 minutos)
+
+Solo se puede grabar cuando los pagos x402 estén funcionando.
+
+**Guión del video:**
+1. Mostrar la UI — presentar MongliAgent
+2. Escribir la pregunta: *"¿Cuáles son los últimos avances en micropagos con blockchain en 2025?"*
+3. Presupuesto: $0.05 USDC
+4. Clic en Investigar — mostrar el plan en el sidebar
+5. Ver el feed de pagos en tiempo real (cada pago con su hash)
+6. Hacer clic en un hash → se abre Stellar Expert y se ve la transacción
+7. Mostrar el reporte final generado
+8. Cerrar con el total gastado y el tiempo
+
+---
+
+## Variables de entorno en Railway (estado actual)
+
+| Variable | Estado |
+|---|---|
+| `ANTHROPIC_API_KEY` | ✅ configurada (sin créditos — se usa fallback local) |
+| `STELLAR_SECRET_KEY` | ✅ configurada |
+| `STELLAR_PUBLIC_KEY` | ✅ configurada |
+| `STELLAR_NETWORK` | ✅ `testnet` |
+| `SEARCH_API_KEY` | ✅ configurada (Brave Search) |
+| `PORT` | ✅ `3000` |
+| `RECIPIENT_ADDRESS` | ⚠️ Eliminar — tenía valor inválido "Gtukey" |
+| `SERVICE_SEARCH_ADDRESS` | ⚠️ Eliminar — innecesaria |
+| `SERVICE_SUMMARY_ADDRESS` | ⚠️ Eliminar — innecesaria |
+| `SERVICE_DATA_ADDRESS` | ⚠️ Eliminar — innecesaria |
+| `SERPAPI_KEY` | ⚠️ Eliminar — duplicada con SEARCH_API_KEY |
+
+---
+
+## URLs de producción
+
+| Servicio | URL |
+|---|---|
+| UI (Vercel) | (agregar URL de Vercel aquí) |
+| Orchestrator (Railway) | `https://mongliagent-production.up.railway.app` |
+| Health check | `https://mongliagent-production.up.railway.app/health` |
+| Stellar Explorer | `https://stellar.expert/explorer/testnet` |
 
 ---
 
 ## Requisitos formales del hackathon — checklist
 
-- [x] **Repositorio público** — GitHub con código fuente completo. Ya cumplido.
-- [ ] **README detallado** — Explicar qué es el proyecto, cómo instalarlo,
-  variables de entorno, qué funciona y qué no. El actual está incompleto.
-- [ ] **Video demo de 2 a 3 minutos** — Mostrar el flujo completo:
-  pregunta → live feed de pagos → hash de transacción verificable → reporte final.
-  Todavía no se puede grabar porque el backend no está corriendo.
-- [ ] **Transacciones reales en Stellar Testnet o Mainnet** — El hackathon exige
-  esto explícitamente. Actualmente hay 0 transacciones procesadas.
+- [x] Repositorio público en GitHub
+- [x] Código fuente completo
+- [x] UI en español
+- [x] Orchestrator deployado
+- [ ] README detallado
+- [ ] Transacciones reales verificables en Stellar Testnet
+- [ ] Video demo de 2-3 minutos
 
 ---
 
-## Meta final — lo que debe verse en el video demo
-
-| # | Paso | Estado |
-|---|---|---|
-| 1 | Usuario escribe la pregunta en español (ej: "¿Cuáles son los últimos avances en pagos con IA en 2025?") | Pendiente |
-| 2 | Usuario define el presupuesto en USDC (slider o input, ej: 0.10 USDC) | Pendiente |
-| 3 | Clic en "Investigar" y el agente arranca — el orchestrator planifica las subtareas automáticamente | Bloqueado |
-| 4 | Live feed muestra cada pago en tiempo real: Servicio · monto cobrado · hash de transacción · balance restante | Bloqueado |
-| 5 | Al menos un hash verificable en Stellar Explorer — el juez hace clic y ve la transacción real on-chain | Bloqueado |
-| 6 | Reporte final aparece en español: Resumen · fuentes consultadas · total gastado · tiempo | Bloqueado |
-
----
-
-## Instrucción completa para Claude Code
+## USDC issuer en Testnet
 
 ```
-PRIORIDAD MÁXIMA — el hackathon cierra mañana 13 de abril.
-
-El proyecto MongliAgent tiene la UI funcionando en Vercel pero el
-orchestrator y los servicios x402 no están deployados. La UI llama
-a /api/research y recibe 404. Necesito que todo funcione en español
-de punta a punta hoy.
-
-Haz esto en orden estricto:
-
-1. TRADUCIR la UI completa al español — todos los textos, labels,
-   mensajes del live feed, errores y el reporte final deben estar
-   en español.
-
-2. CREAR el orchestrator en apps/orchestrator/src/index.ts con:
-   - POST /investigar que recibe { pregunta, presupuestoUsdc }
-   - GET /estado/:sessionId que devuelve el log de pagos en tiempo real
-   - Lógica con Claude API para planificar máximo 3 subtareas
-   - Función payAndFetch en packages/stellar-utils que maneja el
-     ciclo x402 completo (402 → firma → reintento → 200)
-   - Escuchar en process.env.PORT || 3000
-
-3. CREAR service-search en apps/service-search/src/index.ts con:
-   - POST /buscar protegido con middleware x402-stellar
-   - Precio: 0.01 USDC por consulta
-   - Llamar a Brave Search API con la SEARCH_API_KEY del .env
-   - Puerto 3001
-
-4. CREAR service-summary en apps/service-summary/src/index.ts con:
-   - POST /resumir protegido con middleware x402-stellar
-   - Precio: 0.02 USDC por resumen
-   - Usar Claude API para resumir el texto recibido
-   - Puerto 3002
-
-5. CREAR railway.json en cada app para el deploy:
-   { "deploy": { "startCommand": "npm start" } }
-
-6. ACTUALIZAR la UI para que:
-   - Llame a la URL del orchestrator en Railway (usar variable
-     de entorno VITE_ORCHESTRATOR_URL)
-   - El live feed haga polling cada 2 segundos a /estado/:sessionId
-   - Muestre: nombre del servicio, monto en USDC, hash de
-     transacción como link al explorador de Stellar testnet,
-     y balance restante
-   - Todo el texto en español
-
-7. HACER commit y push de todo al repo.
-
-8. Decirme exactamente cómo deployar cada servicio en Railway
-   paso a paso.
-
-Las variables de entorno disponibles son:
-ANTHROPIC_API_KEY, STELLAR_SECRET_KEY, STELLAR_PUBLIC_KEY,
-STELLAR_NETWORK=testnet, SEARCH_API_KEY
-
-El issuer de USDC en testnet es:
 GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
 ```
-
----
-
-## Variables de entorno requeridas
-
-| Variable | Descripción |
-|---|---|
-| `ANTHROPIC_API_KEY` | Para Claude API (orchestrator y service-summary) |
-| `STELLAR_SECRET_KEY` | Clave privada de la wallet del agente |
-| `STELLAR_PUBLIC_KEY` | Clave pública de la wallet del agente |
-| `STELLAR_NETWORK` | `testnet` |
-| `SEARCH_API_KEY` | Brave Search o SerpAPI |
-| `VITE_ORCHESTRATOR_URL` | URL pública del orchestrator (Railway) — para la UI |
-
-**USDC issuer en testnet:** `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
