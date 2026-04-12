@@ -6,15 +6,19 @@ import { planResearch } from './planner';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SERVICE_URLS: Record<string, string> = {
-  search: 'http://localhost:3001/search',
-  summarize: 'http://localhost:3002/summarize',
-  facts: 'http://localhost:3003/facts',
-};
+// URLs configurables por variable de entorno — Railway asigna una URL por servicio
+function getServiceUrls(): Record<string, string> {
+  const searchBase = process.env.SERVICE_SEARCH_URL ?? 'http://localhost:3001';
+  const summaryBase = process.env.SERVICE_SUMMARY_URL ?? 'http://localhost:3002';
+  return {
+    search: `${searchBase}/buscar`,
+    summarize: `${summaryBase}/resumir`,
+  };
+}
 
 function getWallet(): WalletConfig {
   const secretKey = process.env.STELLAR_SECRET_KEY;
-  if (!secretKey) throw new Error('STELLAR_SECRET_KEY is not set');
+  if (!secretKey) throw new Error('STELLAR_SECRET_KEY no está configurado');
   return { secretKey, network: 'testnet' };
 }
 
@@ -22,17 +26,20 @@ async function executeSubtask(
   subtask: Subtask,
   wallet: WalletConfig
 ): Promise<{ result: unknown; txHash: string }> {
-  const url = SERVICE_URLS[subtask.service];
+  const urls = getServiceUrls();
+  const url = urls[subtask.service];
+
+  if (!url) {
+    throw new Error(`Servicio desconocido: ${subtask.service}`);
+  }
 
   let fetchOptions: Parameters<typeof payAndFetch>[1];
 
   if (subtask.service === 'search') {
-    fetchOptions = { method: 'POST', body: { query: subtask.input } };
-  } else if (subtask.service === 'summarize') {
-    fetchOptions = { method: 'POST', body: { text: subtask.input } };
+    fetchOptions = { method: 'POST', body: { consulta: subtask.input, query: subtask.input } };
   } else {
-    // facts — GET with query param
-    fetchOptions = { method: 'GET', params: { topic: subtask.input } };
+    // summarize
+    fetchOptions = { method: 'POST', body: { texto: subtask.input, text: subtask.input } };
   }
 
   const result = await payAndFetch(url, fetchOptions, wallet, subtask.service);
@@ -46,29 +53,29 @@ async function generateReport(
   const resultText = results
     .map(
       ({ subtask, result }) =>
-        `### Subtask: ${subtask.service} — "${subtask.input}"\nReason: ${subtask.reason}\nResult:\n${JSON.stringify(result, null, 2)}`
+        `### Subtarea: ${subtask.service} — "${subtask.input}"\nRazón: ${subtask.reason}\nResultado:\n${JSON.stringify(result, null, 2)}`
     )
     .join('\n\n');
 
   const budgetUsed = session.balanceUsed.toFixed(4);
   const elapsed = ((Date.now() - session.startTime) / 1000).toFixed(1);
 
-  const prompt = `You are a research analyst. Write a concise markdown research report.
+  const prompt = `Eres un analista de investigación. Escribe un reporte de investigación conciso en markdown, completamente en español.
 
-Question: ${session.question}
-Budget used: $${budgetUsed} / $${session.budgetUsdc} USDC
-Research time: ${elapsed}s
+Pregunta: ${session.question}
+Presupuesto usado: $${budgetUsed} / $${session.budgetUsdc} USDC
+Tiempo de investigación: ${elapsed}s
 
-Research results:
+Resultados de investigación:
 ${resultText}
 
-Write a markdown report with these sections (use proper markdown headings):
-1. **Executive Summary** — 2-3 sentences answering the question directly
-2. **Key Findings** — bullet points from the research results
-3. **Sources & Costs** — a markdown table: | Source | Type | Cost |
-4. **Conclusion** — 1-2 sentences
+Escribe un reporte en markdown con estas secciones (usa encabezados markdown correctos):
+1. **Resumen ejecutivo** — 2-3 oraciones que respondan la pregunta directamente
+2. **Hallazgos clave** — puntos en viñetas con los resultados de la investigación
+3. **Fuentes y costos** — tabla markdown: | Fuente | Tipo | Costo |
+4. **Conclusión** — 1-2 oraciones
 
-Be factual, concise, and base everything on the provided results.`;
+Sé factual, conciso y basa todo en los resultados proporcionados. Todo en español.`;
 
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
@@ -76,26 +83,32 @@ Be factual, concise, and base everything on the provided results.`;
     messages: [{ role: 'user', content: prompt }],
   });
 
-  return message.content[0].type === 'text' ? message.content[0].text : 'Report generation failed.';
+  return message.content[0].type === 'text'
+    ? message.content[0].text
+    : 'Error al generar el reporte.';
 }
 
 export async function runResearch(session: Session): Promise<void> {
   const wallet = getWallet();
 
   try {
-    // 1. Plan
-    appendLog(session, 'info', `Planning research for: "${session.question}"`);
+    // 1. Planificar
+    appendLog(session, 'info', `Planificando investigación: "${session.question}"`);
     session.status = 'planning';
 
     const subtasks = await planResearch(session.question, session.budgetUsdc);
     session.subtasks = subtasks;
 
-    appendLog(session, 'plan', `Plan ready: ${subtasks.length} subtask(s)`);
+    appendLog(session, 'plan', `Plan listo: ${subtasks.length} subtarea(s)`);
     subtasks.forEach((t, i) => {
-      appendLog(session, 'info', `  ${i + 1}. [${t.service}] ${t.input} ($${t.cost} USDC) — ${t.reason}`);
+      appendLog(
+        session,
+        'info',
+        `  ${i + 1}. [${t.service}] ${t.input} ($${t.cost} USDC) — ${t.reason}`
+      );
     });
 
-    // 2. Execute
+    // 2. Ejecutar
     session.status = 'executing';
     const completedResults: Array<{ subtask: Subtask; result: unknown }> = [];
 
@@ -104,12 +117,16 @@ export async function runResearch(session: Session): Promise<void> {
 
       if (remaining < subtask.cost) {
         subtask.status = 'skipped';
-        appendLog(session, 'warning', `Skipping [${subtask.service}]: insufficient budget ($${remaining.toFixed(4)} remaining, need $${subtask.cost})`);
+        appendLog(
+          session,
+          'warning',
+          `Omitiendo [${subtask.service}]: presupuesto insuficiente ($${remaining.toFixed(4)} restante, necesita $${subtask.cost})`
+        );
         continue;
       }
 
       subtask.status = 'running';
-      appendLog(session, 'info', `Executing [${subtask.service}]: "${subtask.input}"`);
+      appendLog(session, 'info', `Ejecutando [${subtask.service}]: "${subtask.input}"`);
 
       try {
         const { result, txHash } = await executeSubtask(subtask, wallet);
@@ -121,36 +138,49 @@ export async function runResearch(session: Session): Promise<void> {
 
         const balanceAfter = session.budgetUsdc - session.balanceUsed;
 
-        appendLog(session, 'payment', `Paid $${subtask.cost} USDC for [${subtask.service}]`, {
-          service: subtask.service,
-          txHash,
-          amountPaid: String(subtask.cost),
-          balanceAfter,
-        });
+        appendLog(
+          session,
+          'payment',
+          `Pagado $${subtask.cost} USDC por [${subtask.service}]`,
+          {
+            service: subtask.service,
+            txHash,
+            amountPaid: String(subtask.cost),
+            balanceAfter,
+          }
+        );
 
         completedResults.push({ subtask, result });
       } catch (err) {
         subtask.status = 'skipped';
         subtask.error = String(err);
-        appendLog(session, 'error', `[${subtask.service}] failed: ${String(err)}`);
+        appendLog(session, 'error', `[${subtask.service}] falló: ${String(err)}`);
       }
     }
 
-    // 3. Generate report
+    // 3. Generar reporte
     if (completedResults.length === 0) {
-      session.report = '# Research Report\n\nNo results could be retrieved. Please check service availability and budget.';
+      session.report =
+        '# Reporte de Investigación\n\nNo se pudieron obtener resultados. Verifica la disponibilidad de los servicios y el presupuesto.';
     } else {
-      appendLog(session, 'info', 'Generating final report...');
+      appendLog(session, 'info', 'Generando reporte final...');
       session.report = await generateReport(session, completedResults);
     }
 
     session.status = 'completed';
     session.endTime = Date.now();
-    appendLog(session, 'info', `Research complete. Total spent: $${session.balanceUsed.toFixed(4)} USDC in ${((session.endTime - session.startTime) / 1000).toFixed(1)}s`);
+    appendLog(
+      session,
+      'info',
+      `Investigación completada. Total gastado: $${session.balanceUsed.toFixed(4)} USDC en ${(
+        (session.endTime - session.startTime) /
+        1000
+      ).toFixed(1)}s`
+    );
   } catch (err) {
     session.status = 'error';
     session.error = String(err);
     session.endTime = Date.now();
-    appendLog(session, 'error', `Fatal error: ${String(err)}`);
+    appendLog(session, 'error', `Error fatal: ${String(err)}`);
   }
 }

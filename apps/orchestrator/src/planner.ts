@@ -4,35 +4,34 @@ import { v4 as uuidv4 } from 'uuid';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const SERVICE_COSTS: Record<ServiceName, number> = {
+// Solo servicios que existen en producción
+const SERVICE_COSTS: Record<'search' | 'summarize', number> = {
   search: 0.01,
   summarize: 0.02,
-  facts: 0.005,
 };
 
 export async function planResearch(
   question: string,
   budgetUsdc: number
 ): Promise<Subtask[]> {
-  const prompt = `You are a research planning assistant for an autonomous agent with a USDC budget.
+  const prompt = `Eres un asistente de planificación de investigación para un agente autónomo con presupuesto en USDC.
 
-Available services:
-- "search"    → web search for current information         | cost: $0.01 USDC
-- "summarize" → AI summarization of a text passage        | cost: $0.02 USDC
-- "facts"     → structured fact sheet about a topic       | cost: $0.005 USDC
+Servicios disponibles:
+- "search"    → búsqueda web de información actual    | costo: $0.01 USDC
+- "summarize" → resumen con IA de un texto dado       | costo: $0.02 USDC
 
-Budget: ${budgetUsdc} USDC
-Research question: ${question}
+Presupuesto: ${budgetUsdc} USDC
+Pregunta de investigación: ${question}
 
-Plan at most 3 concrete subtasks to answer the question. Keep total cost within budget.
-Prefer "search" as the primary tool. Use "facts" for quick background context. Use "summarize" only if you need to condense lengthy found content.
+Planifica máximo 3 subtareas concretas para responder la pregunta. Mantén el costo total dentro del presupuesto.
+Prefiere "search" como herramienta primaria. Usa "summarize" solo si necesitas condensar contenido extenso.
 
-Respond with ONLY a valid JSON array — no markdown, no explanation:
+Responde SOLO con un array JSON válido — sin markdown, sin explicaciones:
 [
   {
-    "service": "search" | "summarize" | "facts",
-    "input": "<the query string or text to process>",
-    "reason": "<one sentence: why this subtask is needed>"
+    "service": "search" | "summarize",
+    "input": "<la consulta o texto a procesar>",
+    "reason": "<una oración: por qué esta subtarea es necesaria>"
   }
 ]`;
 
@@ -53,14 +52,32 @@ Respond with ONLY a valid JSON array — no markdown, no explanation:
     parsed = match ? JSON.parse(match[0]) : [];
   }
 
-  const subtasks: Subtask[] = parsed.slice(0, 3).map((item) => ({
-    id: uuidv4(),
-    service: (item.service as ServiceName) ?? 'facts',
-    input: item.input ?? '',
-    reason: item.reason ?? '',
-    cost: SERVICE_COSTS[(item.service as ServiceName)] ?? 0.01,
-    status: 'pending',
-  }));
+  const subtasks: Subtask[] = parsed
+    .slice(0, 3)
+    .filter((item) => item.service === 'search' || item.service === 'summarize')
+    .map((item) => {
+      const svc = item.service as 'search' | 'summarize';
+      return {
+        id: uuidv4(),
+        service: svc as ServiceName,
+        input: item.input ?? '',
+        reason: item.reason ?? '',
+        cost: SERVICE_COSTS[svc],
+        status: 'pending',
+      };
+    });
+
+  // Si el planner devuelve vacío, forzar al menos una búsqueda
+  if (subtasks.length === 0) {
+    subtasks.push({
+      id: uuidv4(),
+      service: 'search' as ServiceName,
+      input: question,
+      reason: 'Búsqueda directa de la pregunta de investigación',
+      cost: SERVICE_COSTS.search,
+      status: 'pending',
+    });
+  }
 
   return subtasks;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ResearchForm } from './components/ResearchForm';
 import { PaymentFeed } from './components/PaymentFeed';
 import { ReportPanel } from './components/ReportPanel';
@@ -7,34 +7,41 @@ import { SessionState } from './types';
 
 const POLL_INTERVAL_MS = 2000;
 
-async function startResearch(question: string, budgetUsdc: number): Promise<string> {
-  const res = await fetch('/api/research', {
+// URL del orchestrator — en Vercel, VITE_ORCHESTRATOR_URL apunta a Railway
+const ORCHESTRATOR_URL = (import.meta as { env?: { VITE_ORCHESTRATOR_URL?: string } }).env
+  ?.VITE_ORCHESTRATOR_URL ?? '';
+
+async function iniciarInvestigacion(pregunta: string, presupuestoUsdc: number): Promise<string> {
+  const url = ORCHESTRATOR_URL ? `${ORCHESTRATOR_URL}/investigar` : '/api/investigar';
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question, budgetUsdc }),
+    body: JSON.stringify({ pregunta, presupuestoUsdc }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
-  const data = await res.json();
-  return data.sessionId as string;
+  const data = await res.json() as { sessionId: string };
+  return data.sessionId;
 }
 
-async function fetchStatus(sessionId: string): Promise<SessionState> {
-  const res = await fetch(`/api/status/${sessionId}`);
-  if (!res.ok) throw new Error(`Status fetch failed: HTTP ${res.status}`);
-  return res.json();
+async function obtenerEstado(sessionId: string): Promise<SessionState> {
+  const url = ORCHESTRATOR_URL
+    ? `${ORCHESTRATOR_URL}/estado/${sessionId}`
+    : `/api/estado/${sessionId}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Error al obtener estado: HTTP ${res.status}`);
+  return res.json() as Promise<SessionState>;
 }
 
 export default function App() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [session, setSession] = useState<SessionState | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isCargando, setIsCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const stopPolling = useCallback(() => {
+  const detenerPolling = useCallback(() => {
     if (pollRef.current) {
       clearTimeout(pollRef.current);
       pollRef.current = null;
@@ -43,44 +50,42 @@ export default function App() {
 
   const poll = useCallback(async (sid: string) => {
     try {
-      const state = await fetchStatus(sid);
-      setSession(state);
-      if (state.status === 'completed' || state.status === 'error') {
-        stopPolling();
-        setIsLoading(false);
+      const estado = await obtenerEstado(sid);
+      setSession(estado);
+      if (estado.status === 'completed' || estado.status === 'error') {
+        detenerPolling();
+        setIsCargando(false);
       } else {
         pollRef.current = setTimeout(() => poll(sid), POLL_INTERVAL_MS);
       }
     } catch (err) {
-      console.error('Poll error:', err);
+      console.error('Error en polling:', err);
       pollRef.current = setTimeout(() => poll(sid), POLL_INTERVAL_MS * 2);
     }
-  }, [stopPolling]);
+  }, [detenerPolling]);
 
-  const handleSubmit = useCallback(async (question: string, budgetUsdc: number) => {
-    setIsLoading(true);
+  const handleSubmit = useCallback(async (pregunta: string, presupuestoUsdc: number) => {
+    setIsCargando(true);
     setError(null);
     setSession(null);
-    setSessionId(null);
-    stopPolling();
+    detenerPolling();
 
     try {
-      const sid = await startResearch(question, budgetUsdc);
-      setSessionId(sid);
+      const sid = await iniciarInvestigacion(pregunta, presupuestoUsdc);
       pollRef.current = setTimeout(() => poll(sid), 500);
     } catch (err) {
       setError(String(err));
-      setIsLoading(false);
+      setIsCargando(false);
     }
-  }, [poll, stopPolling]);
+  }, [poll, detenerPolling]);
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
+  useEffect(() => () => detenerPolling(), [detenerPolling]);
 
-  const isDone = session?.status === 'completed' || session?.status === 'error';
+  const terminado = session?.status === 'completed' || session?.status === 'error';
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Header */}
+      {/* Encabezado */}
       <header className="border-b border-gray-800 px-6 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center text-lg">
@@ -88,7 +93,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-white font-bold text-lg leading-none">MongliAgent</h1>
-            <p className="text-gray-500 text-xs">Autonomous research with on-chain micropayments</p>
+            <p className="text-gray-500 text-xs">Investigación autónoma con micropagos on-chain</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -98,10 +103,10 @@ export default function App() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left sidebar */}
+        {/* Panel lateral izquierdo */}
         <aside className="w-80 flex-shrink-0 border-r border-gray-800 flex flex-col overflow-y-auto">
           <div className="p-4 space-y-6">
-            <ResearchForm onSubmit={handleSubmit} isLoading={isLoading} />
+            <ResearchForm onSubmit={handleSubmit} isCargando={isCargando} />
 
             {error && (
               <div className="bg-red-950 border border-red-800 rounded-lg p-3 text-red-400 text-sm">
@@ -111,59 +116,63 @@ export default function App() {
 
             {session && <SubtaskList subtasks={session.subtasks} />}
 
-            {/* Service price reference */}
+            {/* Referencia de precios */}
             <div className="border border-gray-800 rounded-lg p-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                Service Prices
+                Precios de servicios
               </p>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-green-400">search</span>
+                  <span className="text-green-400">búsqueda</span>
                   <span className="text-gray-400">$0.010 USDC</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-yellow-400">summarize</span>
+                  <span className="text-yellow-400">resumen</span>
                   <span className="text-gray-400">$0.020 USDC</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-blue-400">facts</span>
-                  <span className="text-gray-400">$0.005 USDC</span>
                 </div>
               </div>
             </div>
           </div>
         </aside>
 
-        {/* Main content */}
+        {/* Contenido principal */}
         <main className="flex-1 flex flex-col overflow-hidden">
           {!session ? (
             <div className="flex-1 flex items-center justify-center text-gray-700">
               <div className="text-center space-y-3">
                 <div className="text-6xl">🤖</div>
-                <p className="text-lg">Ask a question. Set a budget. Watch the agent work.</p>
+                <p className="text-lg">Haz una pregunta. Pon un presupuesto. El agente trabaja.</p>
                 <p className="text-sm text-gray-600">
-                  Every tool call is paid with real USDC on Stellar Testnet.
+                  Cada consulta se paga con USDC real en Stellar Testnet.
                 </p>
               </div>
             </div>
           ) : (
-            <div className={`flex-1 flex overflow-hidden ${isDone && session.report ? 'flex-row' : 'flex-col'}`}>
-              {/* Payment feed — always visible */}
-              <div className={`${isDone && session.report ? 'w-1/2 border-r border-gray-800' : 'flex-1'} overflow-hidden flex flex-col`}>
+            <div
+              className={`flex-1 flex overflow-hidden ${
+                terminado && session.report ? 'flex-row' : 'flex-col'
+              }`}
+            >
+              {/* Feed de pagos — siempre visible */}
+              <div
+                className={`${
+                  terminado && session.report ? 'w-1/2 border-r border-gray-800' : 'flex-1'
+                } overflow-hidden flex flex-col`}
+              >
                 <PaymentFeed session={session} />
               </div>
 
-              {/* Report panel — shown when done */}
-              {isDone && session.report && (
+              {/* Reporte — aparece al terminar */}
+              {terminado && session.report && (
                 <div className="w-1/2 overflow-hidden flex flex-col">
                   <ReportPanel session={session} />
                 </div>
               )}
 
-              {/* Error state */}
+              {/* Estado de error sin reporte */}
               {session.status === 'error' && !session.report && (
                 <div className="p-4 bg-red-950 border border-red-800 rounded-lg m-4 text-red-400 text-sm">
-                  {session.error ?? 'An unknown error occurred'}
+                  {session.error ?? 'Ocurrió un error desconocido'}
                 </div>
               )}
             </div>

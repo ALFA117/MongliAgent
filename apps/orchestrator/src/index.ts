@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // local only; Railway injects vars directly
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') }); // local only; Railway inyecta vars directamente
 import express from 'express';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,60 +13,34 @@ app.use(express.json());
 
 const PORT = process.env.PORT ?? 3000;
 
-// Validate critical env vars on startup
+// Validar vars críticas al arrancar
 const requiredEnv = ['STELLAR_SECRET_KEY', 'ANTHROPIC_API_KEY'];
 for (const key of requiredEnv) {
   if (!process.env[key]) {
-    console.error(`[orchestrator] ERROR: ${key} is not set`);
+    console.error(`[orchestrator] ERROR: ${key} no está configurado`);
     process.exit(1);
   }
 }
 
-/**
- * POST /research
- * Body: { question: string, budgetUsdc: number }
- * Returns: { sessionId: string }
- */
-app.post('/research', (req, res) => {
-  const { question, budgetUsdc } = req.body as {
-    question?: string;
-    budgetUsdc?: number;
-  };
+// ─── Helpers compartidos ────────────────────────────────────────────────────
 
-  if (!question || typeof question !== 'string' || question.trim().length === 0) {
-    res.status(400).json({ error: 'question is required' });
-    return;
-  }
-
-  const budget = Number(budgetUsdc);
-  if (!budget || budget <= 0 || budget > 10) {
-    res.status(400).json({ error: 'budgetUsdc must be a positive number up to 10' });
-    return;
-  }
-
+function startSession(question: string, budget: number, res: express.Response): void {
   const sessionId = uuidv4();
-  const session = createSession(sessionId, question.trim(), budget);
+  const session = createSession(sessionId, question, budget);
 
-  // Fire-and-forget async execution
   runResearch(session).catch((err) => {
-    console.error(`[orchestrator] Unhandled error in session ${sessionId}:`, err);
+    console.error(`[orchestrator] Error en sesión ${sessionId}:`, err);
   });
 
   res.json({ sessionId });
-});
+}
 
-/**
- * GET /status/:sessionId
- * Returns full session state for polling
- */
-app.get('/status/:sessionId', (req, res) => {
-  const session = getSession(req.params.sessionId);
-
+function sendSession(sessionId: string, res: express.Response): void {
+  const session = getSession(sessionId);
   if (!session) {
-    res.status(404).json({ error: 'Session not found' });
+    res.status(404).json({ error: 'Sesión no encontrada' });
     return;
   }
-
   res.json({
     id: session.id,
     question: session.question,
@@ -90,14 +64,93 @@ app.get('/status/:sessionId', (req, res) => {
     endTime: session.endTime,
     error: session.error,
   });
+}
+
+// ─── Endpoints en español ───────────────────────────────────────────────────
+
+/**
+ * POST /investigar
+ * Body: { pregunta: string, presupuestoUsdc: number }
+ * Returns: { sessionId: string }
+ */
+app.post('/investigar', (req, res) => {
+  const { pregunta, presupuestoUsdc } = req.body as {
+    pregunta?: string;
+    presupuestoUsdc?: number;
+  };
+
+  if (!pregunta || typeof pregunta !== 'string' || pregunta.trim().length === 0) {
+    res.status(400).json({ error: 'El campo "pregunta" es obligatorio' });
+    return;
+  }
+
+  const budget = Number(presupuestoUsdc);
+  if (!budget || budget <= 0 || budget > 10) {
+    res.status(400).json({ error: 'presupuestoUsdc debe ser un número positivo (máximo 10)' });
+    return;
+  }
+
+  startSession(pregunta.trim(), budget, res);
 });
 
+/**
+ * GET /estado/:sessionId
+ * Devuelve el estado completo de la sesión para polling
+ */
+app.get('/estado/:sessionId', (req, res) => {
+  sendSession(req.params.sessionId, res);
+});
+
+// ─── Endpoints en inglés (compatibilidad con versiones anteriores) ──────────
+
+/**
+ * POST /research
+ * Body: { question: string, budgetUsdc: number }
+ */
+app.post('/research', (req, res) => {
+  const { question, budgetUsdc } = req.body as {
+    question?: string;
+    budgetUsdc?: number;
+  };
+
+  if (!question || typeof question !== 'string' || question.trim().length === 0) {
+    res.status(400).json({ error: 'question is required' });
+    return;
+  }
+
+  const budget = Number(budgetUsdc);
+  if (!budget || budget <= 0 || budget > 10) {
+    res.status(400).json({ error: 'budgetUsdc must be a positive number up to 10' });
+    return;
+  }
+
+  startSession(question.trim(), budget, res);
+});
+
+/**
+ * GET /status/:sessionId
+ */
+app.get('/status/:sessionId', (req, res) => {
+  sendSession(req.params.sessionId, res);
+});
+
+// ─── Health ─────────────────────────────────────────────────────────────────
+
 app.get('/health', (_req, res) => {
-  res.json({ service: 'orchestrator', status: 'ok' });
+  res.json({
+    service: 'orchestrator',
+    status: 'ok',
+    wallet: process.env.STELLAR_PUBLIC_KEY ?? '(no configurada)',
+    network: process.env.STELLAR_NETWORK ?? 'testnet',
+    searchUrl: process.env.SERVICE_SEARCH_URL ?? 'http://localhost:3001',
+    summaryUrl: process.env.SERVICE_SUMMARY_URL ?? 'http://localhost:3002',
+  });
 });
 
 app.listen(PORT, () => {
-  console.log(`[orchestrator] Running on :${PORT}`);
-  console.log(`[orchestrator] Agent wallet: ${process.env.STELLAR_PUBLIC_KEY ?? '(not set)'}`);
-  console.log(`[orchestrator] Network: ${process.env.STELLAR_NETWORK ?? 'testnet'}`);
+  console.log(`[orchestrator] Corriendo en :${PORT}`);
+  console.log(`[orchestrator] Wallet: ${process.env.STELLAR_PUBLIC_KEY ?? '(no configurada)'}`);
+  console.log(`[orchestrator] Red: ${process.env.STELLAR_NETWORK ?? 'testnet'}`);
+  console.log(`[orchestrator] service-search: ${process.env.SERVICE_SEARCH_URL ?? 'http://localhost:3001'}`);
+  console.log(`[orchestrator] service-summary: ${process.env.SERVICE_SUMMARY_URL ?? 'http://localhost:3002'}`);
 });

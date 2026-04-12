@@ -1,4 +1,3 @@
-import React from 'react';
 import { Subtask } from '../types';
 
 const STATUS_STYLES: Record<string, string> = {
@@ -8,10 +7,21 @@ const STATUS_STYLES: Record<string, string> = {
   skipped:   'border-red-800 text-red-500 line-through',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  pending:   'pendiente',
+  running:   'ejecutando',
+  completed: 'completado',
+  skipped:   'omitido',
+};
+
 const SERVICE_BADGE: Record<string, string> = {
   search:    'bg-green-900 text-green-300',
   summarize: 'bg-yellow-900 text-yellow-300',
-  facts:     'bg-blue-900 text-blue-300',
+};
+
+const SERVICE_LABELS: Record<string, string> = {
+  search:    'búsqueda',
+  summarize: 'resumen',
 };
 
 interface Props {
@@ -31,10 +41,12 @@ export function SubtaskList({ subtasks }: Props) {
         >
           <div className="flex items-center gap-2">
             <span className={`text-xs px-2 py-0.5 rounded font-semibold ${SERVICE_BADGE[t.service] ?? 'bg-gray-700 text-gray-300'}`}>
-              {t.service}
+              {SERVICE_LABELS[t.service] ?? t.service}
             </span>
             <span className="text-xs font-semibold text-gray-400">${t.cost}</span>
-            <span className="text-xs text-gray-600 capitalize ml-auto">{t.status}</span>
+            <span className="text-xs text-gray-600 capitalize ml-auto">
+              {STATUS_LABELS[t.status] ?? t.status}
+            </span>
           </div>
           <p className="text-xs text-gray-400 mt-1 truncate">{t.input}</p>
           {t.txHash && (
