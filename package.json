@@ -1,0 +1,18 @@
+{
+  "name": "mongliagent",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n orch,search,summary,data,ui -c cyan,green,yellow,blue,magenta \"npm run dev --workspace=apps/orchestrator\" \"npm run dev --workspace=apps/service-search\" \"npm run dev --workspace=apps/service-summary\" \"npm run dev --workspace=apps/service-data\" \"npm run dev --workspace=apps/ui\"",
+    "dev:services": "concurrently -n search,summary,data -c green,yellow,blue \"npm run dev --workspace=apps/service-search\" \"npm run dev --workspace=apps/service-summary\" \"npm run dev --workspace=apps/service-data\"",
+    "dev:orch": "npm run dev --workspace=apps/orchestrator",
+    "dev:ui": "npm run dev --workspace=apps/ui"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
