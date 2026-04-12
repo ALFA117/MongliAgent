@@ -7,9 +7,8 @@ import { SessionState } from './types';
 
 const POLL_INTERVAL_MS = 2000;
 
-// URL del orchestrator — en Vercel, VITE_ORCHESTRATOR_URL apunta a Railway
-const ORCHESTRATOR_URL = (import.meta as { env?: { VITE_ORCHESTRATOR_URL?: string } }).env
-  ?.VITE_ORCHESTRATOR_URL ?? '';
+// URL del orchestrator en Railway
+const ORCHESTRATOR_URL: string = import.meta.env.VITE_ORCHESTRATOR_URL || '';
 
 async function iniciarInvestigacion(pregunta: string, presupuestoUsdc: number): Promise<string> {
   const url = ORCHESTRATOR_URL ? `${ORCHESTRATOR_URL}/investigar` : '/api/investigar';
