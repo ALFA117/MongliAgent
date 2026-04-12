@@ -6,6 +6,7 @@ import {
   Asset,
   BASE_FEE,
   Horizon,
+  Memo,
 } from '@stellar/stellar-sdk';
 
 const USDC_ISSUER_TESTNET = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
@@ -35,7 +36,7 @@ export async function submitUsdcPayment(
   );
 
   if (memo) {
-    builder.addMemo({ type: 'text', value: memo.slice(0, 28) } as any);
+    builder.addMemo(Memo.text(memo.slice(0, 28)));
   }
 
   const transaction = builder.setTimeout(30).build();
