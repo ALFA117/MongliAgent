@@ -4,29 +4,81 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100 font-mono;
+    @apply bg-gray-950 text-gray-100;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-  }
-  ::-webkit-scrollbar-track {
-    @apply bg-gray-900;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-600 rounded;
-  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { @apply bg-gray-900; }
+  ::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-gray-500; }
 }
 
-/* Markdown report styles */
-.report-content h1 { @apply text-2xl font-bold text-white mb-3 mt-5; }
-.report-content h2 { @apply text-xl font-bold text-cyan-400 mb-2 mt-4; }
-.report-content h3 { @apply text-lg font-semibold text-gray-200 mb-2 mt-3; }
-.report-content p  { @apply text-gray-300 mb-3 leading-relaxed; }
-.report-content ul { @apply list-disc list-inside text-gray-300 mb-3 space-y-1; }
-.report-content li { @apply text-gray-300; }
-.report-content table { @apply w-full border-collapse mb-3; }
-.report-content th { @apply bg-gray-700 text-gray-200 px-3 py-2 text-left text-sm; }
-.report-content td { @apply border border-gray-700 px-3 py-2 text-sm text-gray-300; }
-.report-content strong { @apply text-white font-semibold; }
-.report-content code { @apply bg-gray-800 text-green-400 px-1 rounded text-sm; }
+/* ── Markdown report ───────────────────────────────────────────── */
+.report-content { @apply text-sm leading-relaxed; }
+
+.report-content h1 {
+  @apply text-xl font-bold text-white mb-3 mt-5 pb-2 border-b border-gray-800;
+}
+.report-content h2 {
+  @apply text-base font-bold text-cyan-400 mb-2 mt-5 uppercase tracking-wide;
+}
+.report-content h3 {
+  @apply text-sm font-semibold text-gray-200 mb-2 mt-4;
+}
+.report-content p {
+  @apply text-gray-300 mb-3 leading-relaxed;
+}
+.report-content ul {
+  @apply list-none mb-3 space-y-1.5 pl-0;
+}
+.report-content li {
+  @apply text-gray-300 pl-4 relative;
+}
+.report-content li::before {
+  content: "›";
+  @apply absolute left-0 text-cyan-500 font-bold;
+}
+.report-content strong {
+  @apply text-white font-semibold;
+}
+.report-content a {
+  @apply text-cyan-400 hover:text-cyan-300 underline underline-offset-2 transition-colors;
+}
+.report-content code {
+  @apply bg-gray-800 text-green-400 px-1.5 py-0.5 rounded text-xs font-mono;
+}
+.report-content pre {
+  @apply bg-gray-800 rounded-lg p-3 mb-3 overflow-x-auto;
+}
+.report-content pre code {
+  @apply bg-transparent p-0;
+}
+.report-content hr {
+  @apply border-gray-800 my-4;
+}
+
+/* Tablas GFM */
+.report-content table {
+  @apply w-full border-collapse mb-4 text-sm;
+}
+.report-content thead {
+  @apply bg-gray-800;
+}
+.report-content th {
+  @apply text-gray-200 font-semibold px-3 py-2 text-left border border-gray-700;
+}
+.report-content td {
+  @apply border border-gray-800 px-3 py-2 text-gray-300;
+}
+.report-content tr:nth-child(even) td {
+  @apply bg-gray-900/50;
+}
+
+/* ── Feed animation ────────────────────────────────────────────── */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-in {
+  animation: slideIn 0.2s ease-out;
+}
