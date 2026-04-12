@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyUsdcPayment } from '@mongliagent/stellar-utils';
+import { verifyUsdcPayment } from './stellar';
 
 interface X402Options {
   priceUsdc: string;

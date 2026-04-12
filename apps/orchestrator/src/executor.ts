@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { payAndFetch, WalletConfig } from '@mongliagent/stellar-utils';
+import { payAndFetch, WalletConfig } from './stellar';
 import { Session, Subtask } from './types';
 import { appendLog } from './sessions';
 import { planResearch } from './planner';
