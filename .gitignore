@@ -39,3 +39,8 @@ Thumbs.db
 
 # TypeScript cache
 *.tsbuildinfo
+
+# Archivos internos del proyecto
+.claude/
+LOGO/
+PENDIENTES.md

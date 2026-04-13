@@ -1,103 +1,120 @@
 # MongliAgent 🤖
 
-**Agente de investigación autónomo con micropagos x402 en Stellar Testnet**
+**Agente de investigación autónomo con micropagos x402 en Stellar**
 
-MongliAgent recibe una pregunta y un presupuesto en USDC, planifica subtareas de investigación, paga on-chain por cada herramienta que usa (búsqueda web, resumen IA) usando el protocolo x402 sobre Stellar, y entrega un reporte estructurado con todas las transacciones verificables en blockchain.
+MongliAgent es un agente de IA que investiga de forma completamente autónoma y paga por cada herramienta que usa con micropagos reales en USDC sobre la red Stellar usando el protocolo x402. El usuario escribe una pregunta, define un presupuesto, conecta su wallet Freighter y aprueba una sola transacción. A partir de ahí el agente opera solo: planifica subtareas, contrata servicios, paga on-chain y entrega un reporte con fuentes citadas y todas las transacciones verificables en blockchain.
 
 > Construido para el hackathon **Agents on Stellar** — abril 2026
 
 ---
 
-## Demo en vivo
+## Links
 
-| Servicio | URL |
+| | |
 |---|---|
-| UI (Vercel) | https://mongliagent.vercel.app |
-| Orchestrator API (Railway) | https://mongliagent-production.up.railway.app |
-| Health check | https://mongliagent-production.up.railway.app/health |
-| Stellar Explorer (Testnet) | https://stellar.expert/explorer/testnet |
-| Wallet del agente | `GAEMNYLXVHXU3LOISQDACN3KPJULUIO2QUK3H5I2A2DDZOO3AHVEWIO4` |
+| 🎥 **Demo en video** | [youtu.be/vNpK11j91d4](https://youtu.be/vNpK11j91d4) |
+| 🌐 **App en vivo** | [mongliagent.vercel.app](https://mongliagent.vercel.app) |
+| 💻 **Código fuente** | [github.com/ALFA117/MongliAgent](https://github.com/ALFA117/MongliAgent) |
+| 📸 **Instagram** | [@alfa_edg_](https://instagram.com/alfa_edg_) |
+| 🔗 **Orchestrator API** | [mongliagent-production.up.railway.app](https://mongliagent-production.up.railway.app/health) |
+| 🔭 **Stellar Explorer** | [stellar.expert/explorer/testnet](https://stellar.expert/explorer/testnet) |
 
 ---
 
-## Por qué MongliAgent y no un chatbot o navegador normal
+## Cómo funciona
 
-| | Navegador / Google | ChatGPT / Claude | **MongliAgent** |
-|---|---|---|---|
-| Búsquedas automáticas | ❌ Manual | ⚠️ Limitado | ✅ Autónomo |
-| Paga por cada herramienta | ❌ No | ❌ No | ✅ x402 on-chain |
-| Auditable en blockchain | ❌ No | ❌ No | ✅ Cada tx verificable |
-| Control de presupuesto | ❌ No | ❌ No | ✅ Exacto en USDC |
-| Fuentes citadas con costo | ❌ No | ⚠️ A veces | ✅ Tabla con precio por fuente |
-| Wallet propia del usuario | ❌ No | ❌ No | ✅ Freighter — 1 sola firma |
-| Sin suscripción mensual | ✅ | ❌ $20/mes | ✅ Pagas solo lo que usas |
-
-### Ventajas concretas
-
-**vs. hacer la búsqueda tú mismo en el navegador**
-- En vez de abrir 10 pestañas y leer cada una, MongliAgent lo hace solo y te entrega un reporte estructurado con fuentes citadas.
-- Sabes exactamente cuánto costó cada búsqueda: $0.01 USDC por consulta, visible on-chain.
-- Puedes verificar que la información vino de fuentes reales — no es texto generado sin fuente.
-
-**vs. usar ChatGPT o Claude directamente**
-- Los chatbots usan su propio conocimiento o herramientas cerradas. MongliAgent paga por acceso a datos reales en tiempo real.
-- Cada consulta genera una transacción Stellar verificable — transparencia total vs. caja negra.
-- Control de presupuesto real: defines cuánto USDC gastar y el agente se detiene cuando se acaba. Un chatbot no tiene eso.
-- Sin suscripción mensual. Pagas $0.05 por investigación, no $20/mes.
-
-**vs. otras soluciones de agentes IA**
-- Implementa el protocolo x402 nativo — el estándar emergente de micropagos para agentes.
-- Los pagos son reales en Stellar Testnet (no simulados), con hash verificable públicamente.
-- Wallet Connect con Freighter: el usuario controla su propio dinero — el agente nunca tiene acceso a fondos del usuario más allá del presupuesto aprobado en una sola firma.
-
----
-
-## Cómo funciona el protocolo x402
+### El protocolo x402
 
 ```
-Con Freighter (una sola firma al inicio):
-
 Usuario                   Orchestrator               Servicio (ej. /buscar)
    │                           │                              │
-   │── 1. Aprobar en Freighter ▶│ (fondeo de sesión on-chain)  │
+   │── 1. Aprobar en Freighter─▶│  (fondeo de sesión on-chain) │
    │── 2. POST /investigar ─────▶│                              │
    │                            │── POST /buscar ─────────────▶│
-   │                            │                 ◀── 402 Payment Required
-   │                            │── paga con wallet del agente ▶│ (tx on-chain)
+   │                            │              ◀── 402 Payment Required
+   │                            │                  { price: 0.01 USDC,
+   │                            │                    payTo: G... }
+   │                            │── paga en Stellar ──────────▶│  (tx real)
    │                            │── POST /buscar + X-Payment ──▶│
-   │                            │◀─ 200 { results } ────────────│
-   │◀─ 200 { report, txHashes }─│
+   │                            │◀─ 200 { resultados } ─────────│
+   │◀─ reporte + txHashes ──────│
    │
-   ▼ Cada txHash verificable en stellar.expert
+   ▼  Cada txHash verificable en stellar.expert
 ```
 
-El agente ejecuta **pagos reales** en Stellar Testnet. Cada transacción tiene un hash verificable en el explorador público. No es simulado.
+Cuando el agente necesita usar un servicio, el servidor responde con **HTTP 402 Payment Required** especificando el precio en USDC y la dirección Stellar. El agente construye la transacción, la firma y envía on-chain, obtiene el `txHash` y lo adjunta en el header `X-Payment` al reintentar. El servicio verifica el pago en blockchain y entrega los datos. Todo en 3-5 segundos gracias a la finalidad de Stellar.
+
+### Wallet Connect con Freighter
+
+1. El usuario conecta [Freighter](https://freighter.app) desde el header
+2. Al iniciar la investigación, el agente construye **una sola transacción** con el presupuesto completo
+3. Freighter muestra **un único popup de aprobación** — el usuario firma una vez
+4. El agente opera completamente autónomo a partir de ahí
+5. El hash del fondeo aparece en la UI con link directo a Stellar Expert
 
 ---
 
-## Wallet Connect con Freighter
+## Por qué MongliAgent
 
-MongliAgent integra la extensión [Freighter](https://freighter.app) para que el usuario pague con su propia wallet:
+### vs. buscar en Google o navegador
 
-1. Conectar Freighter → ver tu dirección en el header
-2. Hacer clic en "Investigar" → Freighter abre **un solo popup de aprobación**
-3. Aprobar el monto total del presupuesto → 1 transacción on-chain
-4. El agente usa esos fondos para ejecutar la investigación automáticamente
-5. Ver el hash del fondeo en el sidebar con link a Stellar Expert
+En lugar de abrir 10 tabs, leer cada uno y sintetizar manualmente, MongliAgent hace todo eso de forma autónoma y entrega un reporte estructurado con fuentes. Cada búsqueda cuesta $0.01 USDC — visible on-chain.
 
-**Sin Freighter conectado:** el agente usa la wallet del servidor y funciona igual.
+### vs. ChatGPT o Claude
 
-### Fondear tu wallet Freighter con USDC testnet
+Los chatbots usan conocimiento interno o herramientas cerradas sin transparencia. MongliAgent paga por datos reales en tiempo real, cita todas las fuentes, muestra el costo exacto de cada consulta y registra todo en blockchain. Sin alucinaciones sin fuente.
 
-1. Instalar [Freighter](https://freighter.app) en Chrome/Brave
-2. Crear o importar una wallet — cambiar la red a **Testnet**
-3. Copiar tu dirección pública (empieza con G)
-4. Ir a [laboratory.stellar.org](https://laboratory.stellar.org/#account-creator?network=test) → pegar tu dirección → "Fund account with Friendbot" (XLM gratis)
-5. Agregar trustline de USDC:
-   - En Laboratory → Build Transaction → Source: tu dirección → Add Operation → Change Trust
-   - Asset: `USDC`, Issuer: `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
-   - Firmar con tu clave secreta → Submit
-6. Obtener USDC testnet en [faucet.circle.com](https://faucet.circle.com) — seleccionar **Stellar Testnet**
+### vs. otras soluciones de agentes
+
+La mayoría de frameworks de agentes usan APIs centralizadas con billing opaco. MongliAgent implementa x402 — un estándar abierto donde cada transacción es auditable, el presupuesto es exacto y el usuario mantiene el control de sus fondos.
+
+### vs. suscripciones mensuales
+
+Sin $20/mes. Pagas exactamente lo que usas: $0.01-$0.05 USDC por investigación.
+
+---
+
+## Comparativa
+
+| | Navegador | ChatGPT/Claude | **MongliAgent** |
+|---|---|---|---|
+| Búsquedas automáticas | ❌ Manual | ⚠️ Limitado | ✅ Autónomo |
+| Pagos on-chain auditables | ❌ No | ❌ No | ✅ Cada tx verificable |
+| Control exacto de presupuesto | ❌ No | ❌ No | ✅ En USDC |
+| Fuentes citadas con costo | ❌ No | ⚠️ A veces | ✅ Tabla completa |
+| Wallet propia del usuario | ❌ No | ❌ No | ✅ Freighter — 1 firma |
+| Sin suscripción mensual | ✅ | ❌ $20/mes | ✅ Pay-per-use |
+| Transparencia financiera | ❌ No | ❌ No | ✅ Blockchain |
+
+---
+
+## Ventajas
+
+**Transparencia total** — cada pago es una transacción real con un hash verificable públicamente. Cualquier persona puede auditar cuánto gastó el agente y en qué.
+
+**Control exacto del presupuesto** — el usuario define cuánto USDC gastar. El agente se detiene automáticamente cuando se agota. Nunca hay cobros inesperados.
+
+**Sin suscripción** — pay-per-use estricto. Una investigación completa cuesta entre $0.03 y $0.20 USDC.
+
+**Autonomía real** — planifica, ejecuta, paga y reporta sin intervención. Una sola firma de Freighter al inicio es suficiente para toda la sesión.
+
+**Extensible por diseño** — cualquier servicio HTTP que implemente x402 puede ser contratado automáticamente por el agente. El protocolo es abierto.
+
+**Descentralización financiera** — los pagos van directamente entre wallets en Stellar. Sin intermediarios, sin plataforma de pagos centralizada.
+
+**Wallet bajo control del usuario** — Freighter firma con la clave privada que nunca sale del dispositivo. El agente nunca tiene acceso directo a los fondos del usuario.
+
+---
+
+## Desventajas
+
+**Fricción de onboarding** — el usuario necesita instalar Freighter, configurarlo en Testnet y obtener USDC testnet. Más pasos que un chatbot de email y contraseña.
+
+**Velocidad de Stellar** — cada pago tarda 3-5 segundos en confirmarse on-chain. En investigaciones con muchas subtareas ese tiempo se acumula.
+
+**Dependencia de APIs externas** — necesita una API de búsqueda real (SerpAPI/Brave). Hay fallback local pero los resultados son menos relevantes.
+
+**Testnet únicamente** — opera en Stellar Testnet con USDC de prueba. Migración a mainnet requiere auditoría de seguridad adicional.
 
 ---
 
@@ -105,33 +122,35 @@ MongliAgent integra la extensión [Freighter](https://freighter.app) para que el
 
 ```
 apps/
-├── orchestrator/          # Servidor Express consolidado (Railway)
+├── orchestrator/              # Servidor Express consolidado (Railway)
 │   └── src/
-│       ├── index.ts           # Endpoints principales + servicios x402
+│       ├── index.ts           # Endpoints + servicios x402 integrados
 │       ├── planner.ts         # Divide la pregunta en subtareas
 │       ├── executor.ts        # Ejecuta subtareas con payAndFetch
-│       ├── x402Middleware.ts  # Valida pago antes de servir
+│       ├── x402Middleware.ts  # Valida pagos antes de servir
 │       └── stellar/
 │           ├── payAndFetch.ts     # Ciclo x402: solicitar → pagar → reintentar
-│           ├── stellarPay.ts      # Construye, firma y envía la tx Stellar
+│           ├── stellarPay.ts      # Construye, firma y envía tx Stellar
 │           └── types.ts
-└── ui/                    # React + Tailwind (Vercel)
+└── ui/                        # React + Tailwind (Vercel)
     └── src/
         ├── App.tsx                    # Estado global, firma Freighter, polling
         ├── hooks/useFreighter.ts      # Conectar wallet, firmar, enviar a Horizon
         └── components/
             ├── FreighterButton.tsx    # Botón conectar wallet en header
-            ├── ResearchForm.tsx       # Pregunta + presupuesto
+            ├── ResearchForm.tsx       # Pregunta + presupuesto + validación
             ├── PaymentFeed.tsx        # Live feed de eventos en tiempo real
             └── ReportPanel.tsx        # Reporte markdown + txHashes on-chain
 ```
+
+Un solo proceso Express sirve el orchestrator y los servicios `/buscar` y `/resumir`. Así cabe en el plan gratuito de Railway (límite: 2 servicios).
 
 ---
 
 ## Instalación local
 
 ```bash
-git clone https://github.com/ALFA_117_EDG/MongliAgent.git
+git clone https://github.com/ALFA117/MongliAgent.git
 cd MongliAgent
 npm install
 ```
@@ -140,7 +159,7 @@ npm install
 
 ```bash
 cd apps/orchestrator
-cp .env.example .env   # Configura las variables (ver abajo)
+# Crear .env con las variables (ver tabla abajo)
 npm run dev
 ```
 
@@ -148,7 +167,7 @@ npm run dev
 
 ```bash
 cd apps/ui
-# Crea apps/ui/.env.local con:
+# Crear .env.local:
 # VITE_ORCHESTRATOR_URL=http://localhost:3000
 npm run dev
 ```
@@ -157,52 +176,40 @@ npm run dev
 
 ## Variables de entorno
 
-### Orchestrator (Railway / `.env`)
+### Orchestrator (Railway)
 
 | Variable | Descripción | Requerida |
 |---|---|---|
 | `STELLAR_SECRET_KEY` | Clave secreta de la wallet del agente (empieza con S) | ✅ |
 | `STELLAR_PUBLIC_KEY` | Clave pública de la wallet del agente (empieza con G) | ✅ |
-| `STELLAR_NETWORK` | `testnet` o `mainnet` | ✅ |
-| `PORT` | Puerto del servidor Express | Auto (Railway) |
+| `STELLAR_NETWORK` | `testnet` | ✅ |
 | `SEARCH_API_KEY` | API key de SerpAPI o Brave Search | ✅ |
 | `ANTHROPIC_API_KEY` | API key de Anthropic (opcional — hay fallback local) | ⬜ |
 
-### UI (Vercel / `.env.local`)
+### UI (Vercel)
 
 | Variable | Descripción |
 |---|---|
-| `VITE_ORCHESTRATOR_URL` | URL completa del orchestrator en Railway |
+| `VITE_ORCHESTRATOR_URL` | URL del orchestrator en Railway |
 
 ---
 
 ## Fondear la wallet del agente (Testnet)
 
-Para que el agente pueda hacer pagos reales necesita XLM y USDC en Testnet:
+1. Generar keypair en [Stellar Laboratory](https://laboratory.stellar.org/#account-creator?network=test)
+2. Fondear con XLM — clic en "Fund account with Friendbot"
+3. Agregar trustline de USDC:
+   - Asset: `USDC` · Issuer: `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
+4. Obtener USDC testnet en [faucet.circle.com](https://faucet.circle.com) — seleccionar **Stellar Testnet**
+5. Agregar `STELLAR_SECRET_KEY` y `STELLAR_PUBLIC_KEY` en Railway
 
-1. **Generar keypair** en [Stellar Laboratory](https://laboratory.stellar.org/#account-creator?network=test)
-2. **Fondear con XLM** — clic en "Fund account with Friendbot" (gratis)
-3. **Agregar trustline de USDC** — en Laboratory > Build Transaction > Add Operation > Change Trust
-   - Asset: `USDC`, Issuer: `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`
-4. **Obtener USDC Testnet** — [faucet.circle.com](https://faucet.circle.com) (seleccionar **Stellar Testnet**)
-5. Poner `STELLAR_SECRET_KEY` y `STELLAR_PUBLIC_KEY` en las variables de Railway
+### Fondear tu wallet Freighter
 
----
-
-## Deploy
-
-### Orchestrator → Railway
-
-1. Conectar repositorio en [railway.app](https://railway.app)
-2. Root directory: `apps/orchestrator`
-3. Agregar las variables de entorno
-4. Railway detecta el `package.json` y despliega automáticamente
-
-### UI → Vercel
-
-1. Conectar repositorio en [vercel.com](https://vercel.com)
-2. Framework: **Vite** — Root directory: `apps/ui`
-3. Agregar variable: `VITE_ORCHESTRATOR_URL=https://tu-app.up.railway.app`
+1. Instalar [Freighter](https://freighter.app) en Chrome/Brave → cambiar red a **Testnet**
+2. Copiar tu dirección pública (G...)
+3. Ir a [laboratory.stellar.org](https://laboratory.stellar.org/#account-creator?network=test) → "Fund account with Friendbot"
+4. Agregar trustline de USDC (mismo proceso que arriba)
+5. Obtener USDC testnet en [faucet.circle.com](https://faucet.circle.com)
 
 ---
 
@@ -212,76 +219,10 @@ Para que el agente pueda hacer pagos reales necesita XLM y USDC en Testnet:
 |---|---|---|
 | `GET` | `/preparar-sesion` | Construye XDR sin firmar para Freighter |
 | `POST` | `/investigar` | Inicia una sesión de investigación |
-| `GET` | `/estado/:sessionId` | Polling del estado y eventos |
-| `POST` | `/buscar` | Búsqueda web (protegido con x402) |
-| `POST` | `/resumir` | Resumen IA (protegido con x402) |
-| `GET` | `/health` | Estado del servidor + wallet |
-
-### POST `/investigar`
-
-```json
-{
-  "pregunta": "¿Cuáles son los últimos avances en micropagos con IA?",
-  "presupuestoUsdc": 0.10,
-  "userPublicKey": "GABC...",
-  "fundingTxHash": "abc123..."
-}
-```
-
----
-
-## Modelo de negocio — por qué invertir
-
-### El problema que resuelve
-
-Los agentes de IA actualmente no pueden pagar por herramientas de forma autónoma, transparente y sin intermediarios. Usan APIs cerradas, suscripciones mensuales fijas y no tienen accountability financiero. MongliAgent resuelve esto con micropagos x402 en Stellar.
-
-### Revenue streams
-
-| Fuente | Mecanismo | Potencial |
-|---|---|---|
-| **Comisión de protocolo** | 5-10% de cada pago x402 procesado | Escala con el volumen |
-| **API B2B** | Empresas integran el agente en sus productos | Precio por llamada |
-| **White label** | Otras empresas despliegan su propio agente x402 | Licencia mensual |
-| **Marketplace x402** | Catálogo de servicios (búsqueda, datos, análisis, imágenes) que el agente puede contratar | Comisión por transacción |
-| **Datos de mercado** | Estadísticas anonimizadas de qué herramientas usan los agentes y a qué precio | Suscripción analytics |
-
-### Por qué ahora
-
-- El protocolo x402 es **emergente** — quien lo implemente primero a escala establece el estándar.
-- Los agentes de IA pasarán de consumidores de información a **agentes económicos autónomos** que contratan servicios. Ese mercado no tiene infraestructura hoy.
-- Stellar ofrece finalidad en **3-5 segundos** con comisiones de **< $0.001** — ideal para micropagos de agentes.
-- La transparencia on-chain es un diferenciador regulatorio: cada centavo gastado es auditable.
-
-### Tracción actual
-
-- Pagos reales ejecutándose en Stellar Testnet con USDC
-- Protocolo x402 implementado de extremo a extremo
-- UI lista para el consumidor con Wallet Connect (Freighter)
-- Arquitectura multi-servicio consolidada — corre en Railway gratis
-
-### Roadmap de inversión
-
-```
-Fase 1 (0-3 meses)  — Producto
-  ├── Mainnet Stellar con USDC real
-  ├── Marketplace de servicios x402 (búsqueda, datos, análisis)
-  └── SDK público para desarrolladores
-
-Fase 2 (3-9 meses)  — Crecimiento
-  ├── API B2B con pricing por volumen
-  ├── Integraciones con frameworks de agentes (LangChain, CrewAI)
-  └── Dashboard de analytics para proveedores x402
-
-Fase 3 (9-18 meses) — Escala
-  ├── Red de servicios x402 (terceros publican sus propios servicios)
-  ├── Protocolo de reputación on-chain para proveedores
-  └── Expansión a otros blockchains (EVM, Solana)
-```
-
-### Contacto para inversores
-
-**ALFA_EDG** · [@ALFA_EDG_](https://instagram.com/ALFA_EDG_) on Instagram
+| `GET` | `/estado/:sessionId` | Polling del estado y eventos en tiempo real |
+| `POST` | `/buscar` | Búsqueda web protegida con x402 ($0.01 USDC) |
+| `POST` | `/resumir` | Resumen IA protegido con x402 ($0.02 USDC) |
+| `GET` | `/health` | Estado del servidor y wallet del agente |
 
 ---
 
@@ -294,25 +235,41 @@ Fase 3 (9-18 meses) — Escala
 | Pagos | Stellar SDK + protocolo x402 + USDC Testnet |
 | Wallet Connect | @stellar/freighter-api |
 | Búsqueda | SerpAPI / Brave Search |
-| IA (opcional) | Anthropic Claude API |
+| IA (opcional) | Anthropic Claude API + fallback local |
 | Deploy backend | Railway |
 | Deploy frontend | Vercel |
 
 ---
 
-## Transacciones reales verificadas
+## Modelo de negocio
+
+### Revenue streams
+
+| Fuente | Mecanismo |
+|---|---|
+| **Comisión de protocolo** | 5-10% de cada pago x402 procesado |
+| **API B2B** | Empresas integran el agente en sus productos — precio por llamada |
+| **White label** | Otras empresas despliegan su propio agente x402 — licencia mensual |
+| **Marketplace x402** | Catálogo de servicios que el agente puede contratar — comisión por tx |
+| **Analytics** | Estadísticas de qué herramientas usan los agentes y a qué precio |
+
+### Por qué ahora
+
+El protocolo x402 es emergente — quien lo implemente primero a escala establece el estándar. Los agentes de IA están pasando de consumidores de información a agentes económicos autónomos que contratan servicios. Ese mercado no tiene infraestructura hoy. Stellar ofrece finalidad en 3-5 segundos con comisiones de menos de $0.001 — ideal para micropagos de agentes. La transparencia on-chain es además un diferenciador regulatorio.
+
+### Roadmap
 
 ```
-https://stellar.expert/explorer/testnet/tx/<txHash>
+Fase 1 (0-3 meses)   Mainnet Stellar + Marketplace de servicios x402 + SDK público
+Fase 2 (3-9 meses)   API B2B + integraciones con LangChain/CrewAI + analytics
+Fase 3 (9-18 meses)  Red de servicios x402 de terceros + reputación on-chain
 ```
-
-Cada investigación genera múltiples transacciones on-chain, todas verificables públicamente. El fondeo de sesión con Freighter también genera una transacción real.
 
 ---
 
 ## Autor
 
-**ALFA_EDG** · [@ALFA_EDG_](https://instagram.com/ALFA_EDG_) on Instagram
+**ALFA_EDG** · [@alfa_edg_](https://instagram.com/alfa_edg_) on Instagram
 
 ---
 
