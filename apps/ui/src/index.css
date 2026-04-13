@@ -3,12 +3,16 @@
 @tailwind utilities;
 
 @layer base {
+  html, body, #root {
+    height: 100%;
+  }
   body {
-    @apply bg-gray-950 text-gray-100;
+    @apply bg-[#080c14] text-gray-100;
+    -webkit-font-smoothing: antialiased;
   }
 
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { @apply bg-gray-900; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-gray-700 rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-gray-500; }
 }
@@ -17,10 +21,10 @@
 .report-content { @apply text-sm leading-relaxed; }
 
 .report-content h1 {
-  @apply text-xl font-bold text-white mb-3 mt-5 pb-2 border-b border-gray-800;
+  @apply text-lg font-bold text-white mb-3 mt-5 pb-2 border-b border-gray-800;
 }
 .report-content h2 {
-  @apply text-base font-bold text-cyan-400 mb-2 mt-5 uppercase tracking-wide;
+  @apply text-sm font-bold text-cyan-400 mb-2 mt-5 uppercase tracking-widest;
 }
 .report-content h3 {
   @apply text-sm font-semibold text-gray-200 mb-2 mt-4;
@@ -56,29 +60,40 @@
 .report-content hr {
   @apply border-gray-800 my-4;
 }
+.report-content blockquote {
+  @apply border-l-2 border-cyan-700 pl-3 text-gray-400 italic my-3;
+}
 
 /* Tablas GFM */
 .report-content table {
-  @apply w-full border-collapse mb-4 text-sm;
+  @apply w-full border-collapse mb-4 text-xs;
 }
 .report-content thead {
-  @apply bg-gray-800;
+  @apply bg-gray-800/80;
 }
 .report-content th {
-  @apply text-gray-200 font-semibold px-3 py-2 text-left border border-gray-700;
+  @apply text-gray-300 font-semibold px-3 py-2 text-left border border-gray-700/50;
 }
 .report-content td {
-  @apply border border-gray-800 px-3 py-2 text-gray-300;
+  @apply border border-gray-800 px-3 py-2 text-gray-400;
 }
 .report-content tr:nth-child(even) td {
-  @apply bg-gray-900/50;
+  @apply bg-gray-900/40;
 }
 
-/* ── Feed animation ────────────────────────────────────────────── */
+/* ── Animaciones ─────────────────────────────────────────────────── */
 @keyframes slideIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-slide-in {
-  animation: slideIn 0.2s ease-out;
+  animation: slideIn 0.18s ease-out;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(6, 182, 212, 0.3); }
+  50%       { box-shadow: 0 0 12px 2px rgba(6, 182, 212, 0.5); }
+}
+.glow-cyan {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

@@ -7,155 +7,275 @@ import { FreighterButton } from './components/FreighterButton';
 import { useFreighter } from './hooks/useFreighter';
 import { SessionState } from './types';
 
-const POLL_INTERVAL_MS = 2000;
-const ORCHESTRATOR_URL: string = import.meta.env.VITE_ORCHESTRATOR_URL || '';
+const POLL_MS = 2000;
+const API = import.meta.env.VITE_ORCHESTRATOR_URL || '';
 
-async function prepararSesion(userPublicKey: string, presupuestoUsdc: number): Promise<string> {
-  const params = new URLSearchParams({
-    userPublicKey,
-    presupuestoUsdc: presupuestoUsdc.toFixed(7),
-  });
-  const res = await fetch(`${ORCHESTRATOR_URL}/preparar-sesion?${params}`);
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Error preparando sesión' }));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  const data = await res.json() as { xdr: string };
-  return data.xdr;
+// ─── API helpers ────────────────────────────────────────────────
+async function prepararSesion(userPublicKey: string, usdc: number): Promise<string> {
+  const p = new URLSearchParams({ userPublicKey, presupuestoUsdc: usdc.toFixed(7) });
+  const r = await fetch(`${API}/preparar-sesion?${p}`);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+  return (await r.json() as { xdr: string }).xdr;
 }
 
 async function iniciarInvestigacion(
-  pregunta: string,
-  presupuestoUsdc: number,
-  userPublicKey?: string,
-  fundingTxHash?: string
+  pregunta: string, usdc: number,
+  userPublicKey?: string, fundingTxHash?: string
 ): Promise<string> {
-  const res = await fetch(`${ORCHESTRATOR_URL}/investigar`, {
+  const r = await fetch(`${API}/investigar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pregunta, presupuestoUsdc, userPublicKey, fundingTxHash }),
+    body: JSON.stringify({ pregunta, presupuestoUsdc: usdc, userPublicKey, fundingTxHash }),
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  const data = await res.json() as { sessionId: string };
-  return data.sessionId;
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? `HTTP ${r.status}`);
+  return (await r.json() as { sessionId: string }).sessionId;
 }
 
-async function obtenerEstado(sessionId: string): Promise<SessionState> {
-  const res = await fetch(`${ORCHESTRATOR_URL}/estado/${sessionId}`);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<SessionState>;
+async function obtenerEstado(sid: string): Promise<SessionState> {
+  const r = await fetch(`${API}/estado/${sid}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json() as Promise<SessionState>;
 }
 
-type Tab = 'form' | 'feed' | 'report';
+// ─── Tipos ──────────────────────────────────────────────────────
+type Tab = 'inicio' | 'feed' | 'reporte';
 
-function InstagramIcon() {
+// ─── Íconos inline ──────────────────────────────────────────────
+function IgIcon() {
   return (
-    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
     </svg>
   );
 }
 
+// ─── App ────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession] = useState<SessionState | null>(null);
-  const [isCargando, setIsCargando] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [firmando, setFirmando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('form');
+  const [tab, setTab] = useState<Tab>('inicio');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const freighter = useFreighter();
 
-  const detenerPolling = useCallback(() => {
+  const stopPoll = useCallback(() => {
     if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
   }, []);
 
   const poll = useCallback(async (sid: string) => {
     try {
-      const estado = await obtenerEstado(sid);
-      setSession(estado);
-      if (estado.status === 'completed' || estado.status === 'error') {
-        detenerPolling();
-        setIsCargando(false);
-        setActiveTab(estado.report ? 'report' : 'feed');
+      const s = await obtenerEstado(sid);
+      setSession(s);
+      if (s.status === 'completed' || s.status === 'error') {
+        stopPoll();
+        setLoading(false);
+        setTab(s.report ? 'reporte' : 'feed');
       } else {
-        pollRef.current = setTimeout(() => poll(sid), POLL_INTERVAL_MS);
+        pollRef.current = setTimeout(() => poll(sid), POLL_MS);
       }
     } catch {
-      pollRef.current = setTimeout(() => poll(sid), POLL_INTERVAL_MS * 2);
+      pollRef.current = setTimeout(() => poll(sid), POLL_MS * 2);
     }
-  }, [detenerPolling]);
+  }, [stopPoll]);
 
-  const handleSubmit = useCallback(async (pregunta: string, presupuestoUsdc: number) => {
-    setIsCargando(true);
+  const handleSubmit = useCallback(async (pregunta: string, usdc: number) => {
+    if (!freighter.publicKey) return;
+    setLoading(true);
     setError(null);
     setSession(null);
-    detenerPolling();
+    stopPoll();
 
     let fundingTxHash: string | undefined;
-    const userPublicKey = freighter.publicKey ?? undefined;
-
-    // Si Freighter está conectado: UNA sola firma para fondear la sesión
-    if (userPublicKey) {
-      try {
-        setFirmando(true);
-        const xdr = await prepararSesion(userPublicKey, presupuestoUsdc);
-        fundingTxHash = await freighter.signAndSubmit(xdr);
-      } catch (err) {
-        setError(`Error al firmar con Freighter: ${String(err)}`);
-        setIsCargando(false);
-        setFirmando(false);
-        return;
-      } finally {
-        setFirmando(false);
-      }
-    }
-
-    setActiveTab('feed');
     try {
-      const sid = await iniciarInvestigacion(pregunta, presupuestoUsdc, userPublicKey, fundingTxHash);
-      pollRef.current = setTimeout(() => poll(sid), 500);
-    } catch (err) {
-      setError(String(err));
-      setIsCargando(false);
-      setActiveTab('form');
+      setFirmando(true);
+      const xdr = await prepararSesion(freighter.publicKey, usdc);
+      fundingTxHash = await freighter.signAndSubmit(xdr);
+    } catch (e) {
+      setError(`Error al firmar: ${String(e)}`);
+      setLoading(false);
+      setFirmando(false);
+      return;
+    } finally {
+      setFirmando(false);
     }
-  }, [poll, detenerPolling, freighter]);
 
-  useEffect(() => () => detenerPolling(), [detenerPolling]);
+    setTab('feed');
+    try {
+      const sid = await iniciarInvestigacion(pregunta, usdc, freighter.publicKey, fundingTxHash);
+      pollRef.current = setTimeout(() => poll(sid), 500);
+    } catch (e) {
+      setError(String(e));
+      setLoading(false);
+      setTab('inicio');
+    }
+  }, [poll, stopPoll, freighter]);
 
-  const terminado = session?.status === 'completed' || session?.status === 'error';
-  const pagoCount = session?.log.filter(e => e.type === 'payment').length ?? 0;
+  useEffect(() => () => stopPoll(), [stopPoll]);
 
-  const tabs: { id: Tab; label: string; badge?: number }[] = [
-    { id: 'form', label: 'Investigar' },
-    { id: 'feed', label: 'Feed', badge: pagoCount },
-    { id: 'report', label: 'Reporte' },
-  ];
+  const done = session?.status === 'completed' || session?.status === 'error';
+  const pagos = session?.log.filter(e => e.type === 'payment').length ?? 0;
+  const walletOk = freighter.status === 'connected';
 
+  // ─── Sidebar content ─────────────────────────────────────────
+  const SidebarContent = (
+    <div className="p-4 space-y-5">
+
+      {/* Wallet card */}
+      {walletOk && freighter.publicKey ? (
+        <div className="rounded-xl border border-indigo-800/40 bg-indigo-950/20 px-4 py-3 space-y-1">
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Wallet conectada</p>
+          <p className="text-xs text-indigo-300 font-mono break-all leading-relaxed">
+            {freighter.publicKey}
+          </p>
+          <p className="text-[10px] text-gray-600">
+            Una sola firma al inicio — el agente opera solo.
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-gray-800 bg-gray-900/40 px-4 py-3 space-y-2">
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Sin wallet</p>
+          <p className="text-xs text-gray-600">Conecta Freighter para empezar a investigar con tus fondos.</p>
+        </div>
+      )}
+
+      {/* Formulario */}
+      <ResearchForm
+        onSubmit={handleSubmit}
+        isCargando={loading}
+        walletConnected={walletOk}
+        onConnectWallet={freighter.connect}
+      />
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-800/60 bg-red-950/30 px-4 py-3 text-xs text-red-400">
+          <p className="font-bold mb-0.5">Error</p>
+          <p className="text-red-400/80">{error}</p>
+        </div>
+      )}
+
+      {/* Plan de subtareas */}
+      {session && <SubtaskList subtasks={session.subtasks} />}
+
+      {/* Fondeo tx */}
+      {session?.fundingTxHash && (
+        <div className="rounded-xl border border-indigo-800/40 bg-indigo-950/20 px-4 py-3 space-y-1.5">
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Fondeo de sesión</p>
+          <a
+            href={`https://stellar.expert/explorer/testnet/tx/${session.fundingTxHash}`}
+            target="_blank" rel="noopener noreferrer"
+            className="text-indigo-300 text-[11px] font-mono hover:text-indigo-200 underline break-all block"
+          >
+            {session.fundingTxHash.slice(0, 10)}…{session.fundingTxHash.slice(-10)} ↗
+          </a>
+        </div>
+      )}
+
+      {/* Precios */}
+      <div className="rounded-xl border border-gray-800 bg-gray-900/30 px-4 py-3 space-y-2">
+        <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Precios x402</p>
+        {[
+          { label: 'búsqueda web', cost: '0.010', color: 'bg-emerald-500' },
+          { label: 'resumen IA',   cost: '0.020', color: 'bg-amber-500' },
+        ].map(({ label, cost, color }) => (
+          <div key={label} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
+              <span className="text-xs text-gray-400">{label}</span>
+            </div>
+            <span className="text-xs text-gray-500 tabular-nums">${cost} USDC</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Badge hackathon */}
+      <div className="rounded-xl border border-cyan-900/30 bg-cyan-950/10 px-4 py-3 text-center">
+        <p className="text-[10px] font-bold text-cyan-700 uppercase tracking-widest">Agents on Stellar 2026</p>
+        <p className="text-[10px] text-gray-600 mt-0.5">Cada tx es real y verificable en blockchain</p>
+      </div>
+
+    </div>
+  );
+
+  // ─── Contenido principal (feed + reporte) ────────────────────
+  const MainContent = session ? (
+    <div className="flex flex-1 h-full overflow-hidden">
+      {/* Feed */}
+      <div className={`
+        flex flex-col overflow-hidden flex-shrink-0 min-w-0
+        ${done && session.report ? 'hidden md:flex md:w-1/2 md:border-r md:border-gray-800' : 'flex flex-1'}
+        ${tab === 'reporte' ? 'hidden md:flex md:w-1/2 md:border-r md:border-gray-800' : 'flex flex-1'}
+      `}>
+        <PaymentFeed session={session} />
+      </div>
+
+      {/* Reporte */}
+      {done && session.report && (
+        <div className={`
+          flex flex-col overflow-hidden flex-1 min-w-0
+          ${tab === 'feed' ? 'hidden md:flex' : 'flex'}
+        `}>
+          <ReportPanel session={session} />
+        </div>
+      )}
+
+      {/* Error sin reporte */}
+      {session.status === 'error' && !session.report && tab !== 'inicio' && (
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="rounded-xl border border-red-800/60 bg-red-950/30 px-5 py-4 text-sm text-red-400 max-w-sm text-center">
+            {session.error ?? 'Ocurrió un error desconocido.'}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : (
+    // Empty state desktop
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 px-8 text-center">
+      <img src="/logo.jpg" alt="MongliAgent"
+        className="w-20 h-20 rounded-2xl object-cover ring-2 ring-cyan-600/30 shadow-2xl shadow-cyan-500/10" />
+      <div className="space-y-1.5">
+        <p className="text-gray-300 text-base font-semibold">Haz una pregunta.</p>
+        <p className="text-gray-300 text-base font-semibold">Define un presupuesto.</p>
+        <p className="text-cyan-400 text-base font-bold">El agente investiga y paga solo.</p>
+      </div>
+      <p className="text-gray-600 text-xs max-w-xs leading-relaxed">
+        Cada herramienta usada genera una transacción real en Stellar Testnet — verificable públicamente.
+      </p>
+      {!walletOk && (
+        <button
+          onClick={freighter.connect}
+          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold
+            rounded-xl transition-colors flex items-center gap-2"
+        >
+          🔐 Conectar Freighter para empezar
+        </button>
+      )}
+    </div>
+  );
+
+  // ─── Render ──────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col font-mono text-white">
+    <div className="h-screen flex flex-col bg-[#080c14] overflow-hidden">
 
-      {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950 px-4 py-3 flex items-center justify-between flex-shrink-0">
+      {/* ── Header ──────────────────────────────────────────── */}
+      <header className="flex-shrink-0 h-14 px-4 border-b border-gray-800/80 bg-[#0a0f1a]
+        flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative flex-shrink-0">
             <img src="/logo.jpg" alt="MongliAgent"
-              className="w-10 h-10 md:w-12 md:h-12 rounded-xl object-cover ring-2 ring-cyan-500/50" />
-            <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-gray-950 animate-pulse" />
+              className="w-9 h-9 rounded-xl object-cover ring-2 ring-cyan-600/40" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full border-2 border-[#0a0f1a]" />
           </div>
-          <div>
-            <h1 className="font-bold text-base md:text-lg leading-none tracking-tight">
+          <div className="leading-none">
+            <p className="font-bold text-sm tracking-tight">
               Mongli<span className="text-cyan-400">Agent</span>
-            </h1>
-            <p className="text-gray-500 text-xs hidden sm:block">Investigación autónoma · micropagos on-chain</p>
+            </p>
+            <p className="text-gray-600 text-[10px] hidden sm:block mt-0.5">Investigación autónoma · micropagos x402</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-2">
           <FreighterButton
             status={freighter.status}
             publicKey={freighter.publicKey}
@@ -164,179 +284,73 @@ export default function App() {
             onDisconnect={freighter.disconnect}
           />
           <a href="https://instagram.com/ALFA_EDG_" target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-pink-400 transition-colors">
-            <InstagramIcon />
-            <span className="hidden sm:inline">@ALFA_EDG_</span>
+            className="flex items-center gap-1 text-gray-600 hover:text-pink-400 transition-colors text-xs">
+            <IgIcon />
+            <span className="hidden md:inline">@ALFA_EDG_</span>
           </a>
-          <div className="flex items-center gap-1.5 text-xs bg-green-950/60 border border-green-800/50 rounded-full px-2 py-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-green-400 font-semibold text-xs">Testnet</span>
+          <div className="flex items-center gap-1 bg-emerald-950/60 border border-emerald-800/40 rounded-full px-2 py-0.5">
+            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-emerald-400 text-[10px] font-bold">Testnet</span>
           </div>
         </div>
       </header>
 
-      {/* Banner: esperando firma única de Freighter */}
+      {/* ── Banner: firmando ────────────────────────────────── */}
       {firmando && (
-        <div className="bg-indigo-950/80 border-b border-indigo-700/50 px-4 py-2.5 flex items-center gap-2 text-xs text-indigo-200 flex-shrink-0">
+        <div className="flex-shrink-0 bg-indigo-950/80 border-b border-indigo-800/50 px-4 py-2
+          flex items-center gap-2 text-xs text-indigo-200">
           <span className="w-3 h-3 border border-indigo-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-          <span>Aprueba el pago en Freighter — <strong>una sola firma</strong> para toda la investigación.</span>
+          Aprueba el pago en Freighter — <strong>una sola firma</strong> para toda la sesión.
         </div>
       )}
 
-      {/* Mobile tabs */}
-      <div className="flex md:hidden border-b border-gray-800 bg-gray-900 flex-shrink-0">
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-colors relative
-              ${activeTab === tab.id ? 'text-cyan-400 border-b-2 border-cyan-500' : 'text-gray-500'}`}>
-            {tab.label}
-            {tab.badge ? (
-              <span className="ml-1 bg-cyan-600 text-white rounded-full px-1.5 text-xs">{tab.badge}</span>
-            ) : null}
-          </button>
-        ))}
+      {/* ── Mobile tabs ─────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex md:hidden border-b border-gray-800 bg-[#0a0f1a]">
+        {([
+          { id: 'inicio', label: 'Inicio' },
+          { id: 'feed',   label: 'Feed',    badge: pagos },
+          { id: 'reporte',label: 'Reporte', show: done && !!session?.report },
+        ] as { id: Tab; label: string; badge?: number; show?: boolean }[])
+          .filter(t => t.show !== false)
+          .map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 py-2.5 text-[11px] font-bold uppercase tracking-widest transition-colors relative
+                ${tab === t.id
+                  ? 'text-cyan-400 border-b-2 border-cyan-500'
+                  : 'text-gray-600 hover:text-gray-400'}`}
+            >
+              {t.label}
+              {t.badge ? (
+                <span className="ml-1 bg-cyan-700 text-white text-[9px] font-bold rounded-full px-1.5 py-px">
+                  {t.badge}
+                </span>
+              ) : null}
+            </button>
+          ))}
       </div>
 
-      {/* Layout */}
+      {/* ── Body ────────────────────────────────────────────── */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Sidebar */}
+        {/* Sidebar — siempre en desktop, solo en tab 'inicio' en mobile */}
         <aside className={`
-          md:w-80 md:flex-shrink-0 md:border-r md:border-gray-800 md:flex md:flex-col md:overflow-y-auto
-          ${activeTab === 'form' ? 'flex flex-col w-full overflow-y-auto' : 'hidden md:flex'}
+          flex-shrink-0 w-full md:w-80 border-r border-gray-800/80 bg-[#0a0f1a] overflow-y-auto
+          ${tab === 'inicio' ? 'flex flex-col' : 'hidden md:flex md:flex-col'}
         `}>
-          <div className="p-4 space-y-4">
-            <ResearchForm onSubmit={handleSubmit} isCargando={isCargando} />
-
-            {/* Info wallet Freighter */}
-            {freighter.status === 'connected' && freighter.publicKey && (
-              <div className="border border-indigo-800/40 rounded-xl p-3 bg-indigo-950/20 text-xs space-y-1">
-                <p className="text-indigo-400 font-bold uppercase tracking-widest">Tu Wallet Freighter</p>
-                <p className="text-gray-400 font-mono break-all">{freighter.publicKey}</p>
-                <p className="text-gray-600 leading-relaxed">
-                  Firmarás <strong className="text-gray-400">una sola vez</strong> al inicio para fondear la sesión.
-                  El agente ejecuta todos los pagos automáticamente.
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-950/60 border border-red-800/60 rounded-xl p-3 text-red-400 text-xs">
-                <span className="font-bold">Error: </span>{error}
-              </div>
-            )}
-
-            {session && <SubtaskList subtasks={session.subtasks} />}
-
-            {/* Fondeo on-chain del usuario */}
-            {session?.fundingTxHash && (
-              <div className="border border-indigo-800/40 rounded-xl p-3 bg-indigo-950/20 text-xs space-y-1">
-                <p className="text-indigo-400 font-bold uppercase tracking-widest">Fondeo de sesión</p>
-                <a
-                  href={`https://stellar.expert/explorer/testnet/tx/${session.fundingTxHash}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="text-indigo-300 font-mono hover:text-indigo-200 underline break-all"
-                >
-                  {session.fundingTxHash.slice(0, 8)}…{session.fundingTxHash.slice(-8)} ↗
-                </a>
-              </div>
-            )}
-
-            <div className="border border-gray-800 rounded-xl p-4 bg-gray-900/40">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Precios x402</p>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green-500 rounded-full" />
-                    <span className="text-green-400 text-xs font-semibold">búsqueda</span>
-                  </div>
-                  <span className="text-gray-400 text-xs">$0.010 USDC</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-yellow-500 rounded-full" />
-                    <span className="text-yellow-400 text-xs font-semibold">resumen</span>
-                  </div>
-                  <span className="text-gray-400 text-xs">$0.020 USDC</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-cyan-900/40 rounded-xl p-4 bg-cyan-950/20">
-              <p className="text-xs font-bold text-cyan-700 uppercase tracking-widest mb-1">Agents on Stellar</p>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Cada consulta genera una transacción real verificable on-chain.
-              </p>
-            </div>
-          </div>
+          {SidebarContent}
         </aside>
 
-        {/* Main */}
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
-
-          {!session && (
-            <div className="hidden md:flex flex-1 items-center justify-center">
-              <div className="text-center space-y-5 px-8">
-                <img src="/logo.jpg" alt="MongliAgent"
-                  className="w-24 h-24 rounded-2xl object-cover mx-auto ring-2 ring-cyan-500/30 shadow-2xl shadow-cyan-500/10" />
-                <div className="space-y-1">
-                  <p className="text-lg text-gray-400 font-semibold">Haz una pregunta.</p>
-                  <p className="text-lg text-gray-400 font-semibold">Pon un presupuesto.</p>
-                  <p className="text-lg text-cyan-400 font-bold">El agente investiga y paga solo.</p>
-                </div>
-                <p className="text-sm text-gray-600">Cada herramienta usada genera una transacción real en Stellar Testnet.</p>
-                {freighter.status === 'idle' && (
-                  <p className="text-xs text-indigo-400/70">
-                    Conecta Freighter para pagar con tu propia wallet — una sola firma.
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {session && (
-            <div className={`
-              flex-1 flex overflow-hidden min-h-0
-              ${terminado && session.report ? 'md:flex-row flex-col' : ''}
-            `}>
-              <div className={`
-                overflow-hidden flex flex-col min-h-0
-                ${terminado && session.report ? 'md:w-1/2 md:border-r md:border-gray-800' : 'flex-1'}
-                ${activeTab === 'feed' || activeTab === 'report' ? 'flex' : 'hidden md:flex'}
-                ${activeTab === 'report' && terminado && session.report ? 'hidden md:flex' : ''}
-              `}>
-                <PaymentFeed session={session} />
-              </div>
-
-              {terminado && session.report && (
-                <div className={`
-                  overflow-hidden flex flex-col min-h-0
-                  ${activeTab === 'report' ? 'flex flex-1' : 'hidden md:flex md:w-1/2'}
-                `}>
-                  <ReportPanel session={session} />
-                </div>
-              )}
-
-              {session.status === 'error' && !session.report && (
-                <div className={`p-4 m-4 bg-red-950/60 border border-red-800/60 rounded-xl text-red-400 text-sm
-                  ${activeTab === 'feed' ? 'block' : 'hidden md:block'}`}>
-                  {session.error ?? 'Ocurrió un error desconocido'}
-                </div>
-              )}
-            </div>
-          )}
+        {/* Main — siempre en desktop, feed/reporte en mobile */}
+        <main className={`
+          flex-1 overflow-hidden min-w-0
+          ${tab === 'inicio' ? 'hidden md:flex md:flex-col' : 'flex flex-col'}
+        `}>
+          {MainContent}
         </main>
-      </div>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800/40 px-4 py-2 flex items-center justify-between flex-shrink-0 bg-gray-950">
-        <span className="text-xs text-gray-700">MongliAgent · Agents on Stellar 2026</span>
-        <a href="https://instagram.com/ALFA_EDG_" target="_blank" rel="noopener noreferrer"
-          className="text-xs text-gray-700 hover:text-pink-400 transition-colors flex items-center gap-1">
-          <InstagramIcon />
-          @ALFA_EDG_
-        </a>
-      </footer>
+      </div>
     </div>
   );
 }

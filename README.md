@@ -230,6 +230,61 @@ Para que el agente pueda hacer pagos reales necesita XLM y USDC en Testnet:
 
 ---
 
+## Modelo de negocio — por qué invertir
+
+### El problema que resuelve
+
+Los agentes de IA actualmente no pueden pagar por herramientas de forma autónoma, transparente y sin intermediarios. Usan APIs cerradas, suscripciones mensuales fijas y no tienen accountability financiero. MongliAgent resuelve esto con micropagos x402 en Stellar.
+
+### Revenue streams
+
+| Fuente | Mecanismo | Potencial |
+|---|---|---|
+| **Comisión de protocolo** | 5-10% de cada pago x402 procesado | Escala con el volumen |
+| **API B2B** | Empresas integran el agente en sus productos | Precio por llamada |
+| **White label** | Otras empresas despliegan su propio agente x402 | Licencia mensual |
+| **Marketplace x402** | Catálogo de servicios (búsqueda, datos, análisis, imágenes) que el agente puede contratar | Comisión por transacción |
+| **Datos de mercado** | Estadísticas anonimizadas de qué herramientas usan los agentes y a qué precio | Suscripción analytics |
+
+### Por qué ahora
+
+- El protocolo x402 es **emergente** — quien lo implemente primero a escala establece el estándar.
+- Los agentes de IA pasarán de consumidores de información a **agentes económicos autónomos** que contratan servicios. Ese mercado no tiene infraestructura hoy.
+- Stellar ofrece finalidad en **3-5 segundos** con comisiones de **< $0.001** — ideal para micropagos de agentes.
+- La transparencia on-chain es un diferenciador regulatorio: cada centavo gastado es auditable.
+
+### Tracción actual
+
+- Pagos reales ejecutándose en Stellar Testnet con USDC
+- Protocolo x402 implementado de extremo a extremo
+- UI lista para el consumidor con Wallet Connect (Freighter)
+- Arquitectura multi-servicio consolidada — corre en Railway gratis
+
+### Roadmap de inversión
+
+```
+Fase 1 (0-3 meses)  — Producto
+  ├── Mainnet Stellar con USDC real
+  ├── Marketplace de servicios x402 (búsqueda, datos, análisis)
+  └── SDK público para desarrolladores
+
+Fase 2 (3-9 meses)  — Crecimiento
+  ├── API B2B con pricing por volumen
+  ├── Integraciones con frameworks de agentes (LangChain, CrewAI)
+  └── Dashboard de analytics para proveedores x402
+
+Fase 3 (9-18 meses) — Escala
+  ├── Red de servicios x402 (terceros publican sus propios servicios)
+  ├── Protocolo de reputación on-chain para proveedores
+  └── Expansión a otros blockchains (EVM, Solana)
+```
+
+### Contacto para inversores
+
+**ALFA_EDG** · [@ALFA_EDG_](https://instagram.com/ALFA_EDG_) on Instagram
+
+---
+
 ## Stack tecnológico
 
 | Capa | Tecnología |
