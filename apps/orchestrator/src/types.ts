@@ -37,4 +37,6 @@ export interface Session {
   startTime: number;
   endTime?: number;
   error?: string;
+  userPublicKey?: string;    // si el usuario conectó Freighter
+  fundingTxHash?: string;    // tx de fondeo firmada por el usuario
 }

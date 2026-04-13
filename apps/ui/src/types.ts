@@ -37,4 +37,6 @@ export interface SessionState {
   startTime: number;
   endTime?: number;
   error?: string;
+  userPublicKey?: string;
+  fundingTxHash?: string;
 }

@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createSession, getSession } from './sessions';
 import { runResearch } from './executor';
 import { x402Middleware } from './x402Middleware';
+import { buildUnsignedPaymentXdr } from './stellar/stellarPay';
 
 const app = express();
 app.use(cors());
@@ -83,15 +84,47 @@ function sendSession(sessionId: string, res: express.Response): void {
     startTime: session.startTime,
     endTime: session.endTime,
     error: session.error,
+    userPublicKey: session.userPublicKey,
+    fundingTxHash: session.fundingTxHash,
   });
 }
 
 // ─── Orchestrator ────────────────────────────────────────────────────────────
 
+// Construye el XDR sin firmar para que el usuario lo firme con Freighter (UNA sola vez)
+app.get('/preparar-sesion', async (req, res) => {
+  const { userPublicKey, presupuestoUsdc } = req.query as {
+    userPublicKey?: string;
+    presupuestoUsdc?: string;
+  };
+  if (!isStellarKey(userPublicKey)) {
+    res.status(400).json({ error: 'userPublicKey inválida' });
+    return;
+  }
+  const amount = parseFloat(presupuestoUsdc ?? '0');
+  if (!amount || amount <= 0 || amount > 10) {
+    res.status(400).json({ error: 'presupuestoUsdc inválido' });
+    return;
+  }
+  try {
+    const xdr = await buildUnsignedPaymentXdr(
+      userPublicKey!,
+      RECIPIENT,
+      amount.toFixed(7),
+      'MongliAgent sesion'
+    );
+    res.json({ xdr, agentWallet: RECIPIENT });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 app.post('/investigar', (req, res) => {
-  const { pregunta, presupuestoUsdc } = req.body as {
+  const { pregunta, presupuestoUsdc, userPublicKey, fundingTxHash } = req.body as {
     pregunta?: string;
     presupuestoUsdc?: number;
+    userPublicKey?: string;
+    fundingTxHash?: string;
   };
   if (!pregunta?.trim()) {
     res.status(400).json({ error: 'El campo "pregunta" es obligatorio' });
@@ -102,7 +135,17 @@ app.post('/investigar', (req, res) => {
     res.status(400).json({ error: 'presupuestoUsdc debe ser un número positivo (máximo 10)' });
     return;
   }
-  startSession(pregunta.trim(), budget, res);
+  const validatedUserKey = isStellarKey(userPublicKey) ? userPublicKey : undefined;
+  const sessionId = uuidv4();
+  const session = createSession(sessionId, pregunta.trim(), budget);
+  if (validatedUserKey) {
+    session.userPublicKey = validatedUserKey;
+    session.fundingTxHash = fundingTxHash?.trim() || undefined;
+  }
+  runResearch(session).catch((err) => {
+    console.error(`[MongliAgent] Error en sesión ${sessionId}:`, err);
+  });
+  res.json({ sessionId });
 });
 
 app.get('/estado/:sessionId', (req, res) => {

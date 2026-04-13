@@ -46,6 +46,35 @@ export async function submitUsdcPayment(
   return { txHash: result.hash, amountPaid: amount };
 }
 
+/**
+ * Construye una transacción de pago USDC sin firmarla.
+ * Devuelve el XDR en base64 para que el usuario lo firme con Freighter.
+ */
+export async function buildUnsignedPaymentXdr(
+  sourcePublicKey: string,
+  destination: string,
+  amount: string,
+  memo?: string
+): Promise<string> {
+  const server = new Horizon.Server(HORIZON_TESTNET);
+  const account = await server.loadAccount(sourcePublicKey);
+  const usdcAsset = new Asset('USDC', USDC_ISSUER_TESTNET);
+
+  const builder = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: Networks.TESTNET,
+  }).addOperation(
+    Operation.payment({ destination, asset: usdcAsset, amount })
+  );
+
+  if (memo) {
+    builder.addMemo(Memo.text(memo.slice(0, 28)));
+  }
+
+  const transaction = builder.setTimeout(30).build();
+  return transaction.toEnvelope().toXDR('base64');
+}
+
 export async function verifyUsdcPayment(
   txHash: string,
   recipientAddress: string,

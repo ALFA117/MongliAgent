@@ -43,7 +43,7 @@ export async function payAndFetch(
     throw new Error(`${serviceName} devolvió 402 sin requisitos de pago`);
   }
 
-  // Paso 2: pago USDC en Stellar
+  // Paso 2: pago USDC en Stellar con la wallet del servidor
   const { txHash, amountPaid } = await submitUsdcPayment(
     wallet.secretKey,
     requirements.payTo,

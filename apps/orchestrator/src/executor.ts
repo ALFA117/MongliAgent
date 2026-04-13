@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { payAndFetch, WalletConfig } from './stellar';
+import { payAndFetch } from './stellar';
+import type { WalletConfig } from './stellar';
 import { Session, Subtask } from './types';
 import { appendLog } from './sessions';
 import { planResearch } from './planner';
@@ -37,7 +38,6 @@ async function executeSubtask(
   if (subtask.service === 'search') {
     fetchOptions = { method: 'POST', body: { consulta: subtask.input, query: subtask.input } };
   } else {
-    // summarize
     fetchOptions = { method: 'POST', body: { texto: subtask.input, text: subtask.input } };
   }
 
@@ -139,7 +139,6 @@ async function generateReport(
       ? message.content[0].text
       : generateReportLocal(session, results);
   } catch {
-    // Sin créditos — reporte local sin LLM
     return generateReportLocal(session, results);
   }
 }

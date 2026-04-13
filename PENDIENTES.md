@@ -1,80 +1,85 @@
 # Pendientes — MongliAgent Hackathon
 
-**Fecha límite:** 13 de abril 2026 · **Última actualización:** 12 de abril ~3:30 PM
+**Fecha límite:** 13 de abril 2026 · **Última actualización:** 13 de abril ~3:30 AM
 
 ---
 
-## Estado actual
+## ✅ Completado
 
-| Ítem | Estado |
+| Ítem | Notas |
 |---|---|
-| Orchestrator deployado en Railway | ✅ Listo |
-| UI en español con logo e Instagram | ✅ Listo |
-| UI conectada a Railway | ✅ Listo |
-| UI responsive para móvil (tabs) | ✅ Listo |
-| Live feed con polling cada 2s | ✅ Listo |
-| Planner sin Claude API (fallback) | ✅ Listo |
-| Reporte sin Claude API (local) | ✅ Listo |
-| Fix Stellar SDK (Memo.text) | ✅ Listo |
-| Tablas markdown renderizadas (remark-gfm) | ✅ Listo |
-| Transacciones on-chain visibles para jueces | ✅ Listo |
-| Wallet del servidor fondeada (XLM + USDC testnet) | ✅ Listo |
-| Pagos x402 reales ejecutándose | ✅ **FUNCIONANDO** — 2 tx reales confirmadas |
-| Wallet Connect / login usuario con Freighter | ⬜ Pendiente |
-| README actualizado | ⬜ Pendiente |
-| Video demo grabado | ⬜ Pendiente |
+| Orchestrator deployado en Railway | Corriendo en Railway |
+| UI en español con logo e Instagram | Vercel |
+| UI conectada a Railway | VITE_ORCHESTRATOR_URL configurada |
+| UI responsive para móvil (tabs) | Form / Feed / Reporte |
+| Live feed con polling cada 2s | Funciona |
+| Planner sin Claude API (fallback) | Funciona sin créditos |
+| Reporte sin Claude API (local) | Fallback local con markdown |
+| Fix Stellar SDK (Memo.text) | Corregido |
+| Tablas markdown renderizadas (remark-gfm) | Funciona |
+| Transacciones on-chain visibles para jueces | Links a Stellar Expert |
+| Wallet del servidor fondeada (XLM + USDC testnet) | 20 USDC testnet |
+| Pagos x402 reales ejecutándose | 2 tx reales confirmadas |
+| README completo y pulido | Incluye diagrama x402, variables, deploy, API |
+| **Wallet Connect con Freighter** | Implementado — firma real con wallet del usuario |
 
 ---
 
-## Lo que falta para el hackathon
+## ⬜ Pendiente
 
-### 1. README — requerido por los jueces
-
-El README actual está incompleto. Necesita:
-- Descripción del proyecto (qué es MongliAgent, cómo funciona)
-- Flujo x402 explicado (pregunta → plan → pago Stellar → resultado)
-- Variables de entorno requeridas
-- URLs de producción (Railway + Vercel)
-- Screenshot del demo
-
----
-
-### 2. Video demo — requerido (2-3 minutos)
-
-Ya se puede grabar porque los pagos funcionan.
-
-**Guión:**
-1. Mostrar la UI — presentar MongliAgent
-2. Escribir pregunta: *"¿Cuáles son los últimos avances en micropagos con blockchain?"*
-3. Presupuesto: $0.05 USDC — clic en Investigar
-4. Mostrar el feed de pagos en tiempo real
-5. Hacer clic en un hash → Stellar Expert → transacción real
-6. Mostrar el reporte final con fuentes
+| Ítem | Prioridad | Notas |
+|---|---|---|
+| **Video demo** | 🔴 Alta | Requerido por los jueces. 2-3 minutos |
+| Deploy del orchestrator con cambios de Freighter | 🔴 Alta | Hay que hacer push y que Railway redeploy |
+| Deploy de la UI con cambios de Freighter | 🔴 Alta | Push + que Vercel redeploy |
+| Instalar Freighter en el navegador del demo | 🔴 Alta | Necesario para mostrar el flujo completo |
+| Fondear wallet de Freighter con USDC testnet | 🟡 Media | Friendbot XLM + trustline USDC + Circle faucet |
+| Limpiar variables innecesarias en Railway | 🟢 Baja | RECIPIENT_ADDRESS, SERPAPI_KEY, etc. |
 
 ---
 
-### 3. Wallet Connect con Freighter (opcional pero impresiona)
+## 📹 Guión del video demo
 
-Permitir que el visitante conecte su propia wallet Freighter y pague con sus fondos.
-
-**Lo que hay que hacer:**
-- Instalar `@stellar/freighter-api` en la UI
-- Agregar botón "Conectar Wallet" en el header
-- Mostrar la public key del usuario conectado
-- Enviar pagos firmados desde el frontend en vez del servidor
-
-**Complejidad:** Alta. Requiere rediseño del flujo payAndFetch.
-**Alternativa simple:** Solo mostrar la public key del servidor como "wallet del agente" — ya se muestra en `/health`.
+1. Abrir la UI — presentar MongliAgent
+2. Mostrar botón "Conectar Wallet" en el header → conectar Freighter
+3. Ver la dirección de la wallet conectada en el sidebar
+4. Escribir pregunta: *"¿Cuáles son los últimos avances en micropagos con blockchain?"*
+5. Presupuesto: $0.05 USDC — clic en Investigar
+6. Aparece banner "Esperando firma de Freighter…" → Freighter abre popup
+7. Aprobar el pago → ver la tx aparecer en el feed en tiempo real
+8. Repetir para el segundo pago
+9. Clic en un hash → Stellar Expert → transacción real del usuario
+10. Mostrar el reporte final con fuentes
 
 ---
 
-## Variables en Railway — limpiar
+## 🚀 Pasos para el deploy final
 
-Eliminar estas variables innecesarias que pueden causar confusión:
+### 1. Push del código
+```bash
+git add -A
+git commit -m "feat: Wallet Connect con Freighter + README"
+git push
+```
+
+### 2. Railway — redeploy automático tras el push
+
+### 3. Vercel — redeploy automático tras el push
+
+### 4. Probar en producción
+- Abrir https://mongliagent.vercel.app
+- Conectar Freighter (extensión en Chrome)
+- Hacer una investigación y aprobar los pagos
+
+---
+
+## Variables en Railway — limpiar (baja prioridad)
+
+Eliminar estas variables innecesarias:
 
 | Variable | Acción |
 |---|---|
-| `RECIPIENT_ADDRESS` | Eliminar (tenía valor inválido) |
+| `RECIPIENT_ADDRESS` | Eliminar |
 | `SERVICE_SEARCH_ADDRESS` | Eliminar |
 | `SERVICE_SUMMARY_ADDRESS` | Eliminar |
 | `SERVICE_DATA_ADDRESS` | Eliminar |
@@ -88,6 +93,7 @@ Eliminar estas variables innecesarias que pueden causar confusión:
 |---|---|
 | Orchestrator (Railway) | `https://mongliagent-production.up.railway.app` |
 | Health check | `https://mongliagent-production.up.railway.app/health` |
+| UI (Vercel) | `https://mongliagent.vercel.app` |
 | Stellar Explorer | `https://stellar.expert/explorer/testnet` |
 | Wallet del agente | `GAEMNYLXVHXU3LOISQDACN3KPJULUIO2QUK3H5I2A2DDZOO3AHVEWIO4` |
 
@@ -100,9 +106,10 @@ Eliminar estas variables innecesarias que pueden causar confusión:
 - [x] UI en español
 - [x] Orchestrator deployado y corriendo
 - [x] Transacciones reales en Stellar Testnet (hash verificable)
-- [ ] README detallado
-- [ ] Video demo de 2-3 minutos
-- [ ] (Opcional) Wallet Connect con Freighter
+- [x] README detallado con diagrama x402
+- [x] Wallet Connect con Freighter implementado
+- [ ] **Deploy del código nuevo** (push + Railway/Vercel redeploy)
+- [ ] **Video demo de 2-3 minutos**
 
 ---
 

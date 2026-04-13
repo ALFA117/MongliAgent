@@ -3,16 +3,37 @@ import { ResearchForm } from './components/ResearchForm';
 import { PaymentFeed } from './components/PaymentFeed';
 import { ReportPanel } from './components/ReportPanel';
 import { SubtaskList } from './components/SubtaskList';
+import { FreighterButton } from './components/FreighterButton';
+import { useFreighter } from './hooks/useFreighter';
 import { SessionState } from './types';
 
 const POLL_INTERVAL_MS = 2000;
 const ORCHESTRATOR_URL: string = import.meta.env.VITE_ORCHESTRATOR_URL || '';
 
-async function iniciarInvestigacion(pregunta: string, presupuestoUsdc: number): Promise<string> {
+async function prepararSesion(userPublicKey: string, presupuestoUsdc: number): Promise<string> {
+  const params = new URLSearchParams({
+    userPublicKey,
+    presupuestoUsdc: presupuestoUsdc.toFixed(7),
+  });
+  const res = await fetch(`${ORCHESTRATOR_URL}/preparar-sesion?${params}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: 'Error preparando sesión' }));
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
+  }
+  const data = await res.json() as { xdr: string };
+  return data.xdr;
+}
+
+async function iniciarInvestigacion(
+  pregunta: string,
+  presupuestoUsdc: number,
+  userPublicKey?: string,
+  fundingTxHash?: string
+): Promise<string> {
   const res = await fetch(`${ORCHESTRATOR_URL}/investigar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pregunta, presupuestoUsdc }),
+    body: JSON.stringify({ pregunta, presupuestoUsdc, userPublicKey, fundingTxHash }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
@@ -41,9 +62,12 @@ function InstagramIcon() {
 export default function App() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [isCargando, setIsCargando] = useState(false);
+  const [firmando, setFirmando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('form');
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const freighter = useFreighter();
 
   const detenerPolling = useCallback(() => {
     if (pollRef.current) { clearTimeout(pollRef.current); pollRef.current = null; }
@@ -69,17 +93,37 @@ export default function App() {
     setIsCargando(true);
     setError(null);
     setSession(null);
-    setActiveTab('feed');
     detenerPolling();
+
+    let fundingTxHash: string | undefined;
+    const userPublicKey = freighter.publicKey ?? undefined;
+
+    // Si Freighter está conectado: UNA sola firma para fondear la sesión
+    if (userPublicKey) {
+      try {
+        setFirmando(true);
+        const xdr = await prepararSesion(userPublicKey, presupuestoUsdc);
+        fundingTxHash = await freighter.signAndSubmit(xdr);
+      } catch (err) {
+        setError(`Error al firmar con Freighter: ${String(err)}`);
+        setIsCargando(false);
+        setFirmando(false);
+        return;
+      } finally {
+        setFirmando(false);
+      }
+    }
+
+    setActiveTab('feed');
     try {
-      const sid = await iniciarInvestigacion(pregunta, presupuestoUsdc);
+      const sid = await iniciarInvestigacion(pregunta, presupuestoUsdc, userPublicKey, fundingTxHash);
       pollRef.current = setTimeout(() => poll(sid), 500);
     } catch (err) {
       setError(String(err));
       setIsCargando(false);
       setActiveTab('form');
     }
-  }, [poll, detenerPolling]);
+  }, [poll, detenerPolling, freighter]);
 
   useEffect(() => () => detenerPolling(), [detenerPolling]);
 
@@ -110,7 +154,15 @@ export default function App() {
             <p className="text-gray-500 text-xs hidden sm:block">Investigación autónoma · micropagos on-chain</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 md:gap-4">
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <FreighterButton
+            status={freighter.status}
+            publicKey={freighter.publicKey}
+            error={freighter.error}
+            onConnect={freighter.connect}
+            onDisconnect={freighter.disconnect}
+          />
           <a href="https://instagram.com/ALFA_EDG_" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-gray-500 hover:text-pink-400 transition-colors">
             <InstagramIcon />
@@ -122,6 +174,14 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Banner: esperando firma única de Freighter */}
+      {firmando && (
+        <div className="bg-indigo-950/80 border-b border-indigo-700/50 px-4 py-2.5 flex items-center gap-2 text-xs text-indigo-200 flex-shrink-0">
+          <span className="w-3 h-3 border border-indigo-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+          <span>Aprueba el pago en Freighter — <strong>una sola firma</strong> para toda la investigación.</span>
+        </div>
+      )}
 
       {/* Mobile tabs */}
       <div className="flex md:hidden border-b border-gray-800 bg-gray-900 flex-shrink-0">
@@ -140,13 +200,25 @@ export default function App() {
       {/* Layout */}
       <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Desktop sidebar / Mobile form tab */}
+        {/* Sidebar */}
         <aside className={`
           md:w-80 md:flex-shrink-0 md:border-r md:border-gray-800 md:flex md:flex-col md:overflow-y-auto
           ${activeTab === 'form' ? 'flex flex-col w-full overflow-y-auto' : 'hidden md:flex'}
         `}>
           <div className="p-4 space-y-4">
             <ResearchForm onSubmit={handleSubmit} isCargando={isCargando} />
+
+            {/* Info wallet Freighter */}
+            {freighter.status === 'connected' && freighter.publicKey && (
+              <div className="border border-indigo-800/40 rounded-xl p-3 bg-indigo-950/20 text-xs space-y-1">
+                <p className="text-indigo-400 font-bold uppercase tracking-widest">Tu Wallet Freighter</p>
+                <p className="text-gray-400 font-mono break-all">{freighter.publicKey}</p>
+                <p className="text-gray-600 leading-relaxed">
+                  Firmarás <strong className="text-gray-400">una sola vez</strong> al inicio para fondear la sesión.
+                  El agente ejecuta todos los pagos automáticamente.
+                </p>
+              </div>
+            )}
 
             {error && (
               <div className="bg-red-950/60 border border-red-800/60 rounded-xl p-3 text-red-400 text-xs">
@@ -155,6 +227,20 @@ export default function App() {
             )}
 
             {session && <SubtaskList subtasks={session.subtasks} />}
+
+            {/* Fondeo on-chain del usuario */}
+            {session?.fundingTxHash && (
+              <div className="border border-indigo-800/40 rounded-xl p-3 bg-indigo-950/20 text-xs space-y-1">
+                <p className="text-indigo-400 font-bold uppercase tracking-widest">Fondeo de sesión</p>
+                <a
+                  href={`https://stellar.expert/explorer/testnet/tx/${session.fundingTxHash}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-indigo-300 font-mono hover:text-indigo-200 underline break-all"
+                >
+                  {session.fundingTxHash.slice(0, 8)}…{session.fundingTxHash.slice(-8)} ↗
+                </a>
+              </div>
+            )}
 
             <div className="border border-gray-800 rounded-xl p-4 bg-gray-900/40">
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Precios x402</p>
@@ -185,10 +271,9 @@ export default function App() {
           </div>
         </aside>
 
-        {/* Main content */}
+        {/* Main */}
         <main className="flex-1 flex flex-col overflow-hidden min-h-0">
 
-          {/* Desktop: empty state */}
           {!session && (
             <div className="hidden md:flex flex-1 items-center justify-center">
               <div className="text-center space-y-5 px-8">
@@ -200,11 +285,15 @@ export default function App() {
                   <p className="text-lg text-cyan-400 font-bold">El agente investiga y paga solo.</p>
                 </div>
                 <p className="text-sm text-gray-600">Cada herramienta usada genera una transacción real en Stellar Testnet.</p>
+                {freighter.status === 'idle' && (
+                  <p className="text-xs text-indigo-400/70">
+                    Conecta Freighter para pagar con tu propia wallet — una sola firma.
+                  </p>
+                )}
               </div>
             </div>
           )}
 
-          {/* Feed tab (mobile) / always visible on desktop when session exists */}
           {session && (
             <div className={`
               flex-1 flex overflow-hidden min-h-0
