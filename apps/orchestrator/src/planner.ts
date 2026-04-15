@@ -9,33 +9,43 @@ const SERVICE_COSTS: Record<'search' | 'summarize', number> = {
   summarize: 0.02,
 };
 
+const SEARCH_VARIATIONS = [
+  (q: string) => q,
+  (q: string) => `últimas noticias ${q}`,
+  (q: string) => `${q} análisis expertos`,
+  (q: string) => `${q} datos estadísticas`,
+  (q: string) => `${q} tendencias 2025`,
+  (q: string) => `${q} pros contras`,
+  (q: string) => `${q} ejemplos casos reales`,
+  (q: string) => `${q} impacto futuro`,
+  (q: string) => `${q} comparativa alternativas`,
+  (q: string) => `investigación científica ${q}`,
+];
+
 function fallbackPlan(question: string, budgetUsdc: number): Subtask[] {
   const tasks: Subtask[] = [];
 
-  // Siempre buscar
-  tasks.push({
-    id: uuidv4(),
-    service: 'search' as ServiceName,
-    input: question,
-    reason: 'Búsqueda principal sobre la pregunta',
-    cost: SERVICE_COSTS.search,
-    status: 'pending',
-  });
+  // Calcular cuántas búsquedas caben en el presupuesto (máximo 10)
+  const maxSearches = Math.min(
+    Math.floor(budgetUsdc / SERVICE_COSTS.search),
+    SEARCH_VARIATIONS.length
+  );
+  const numSearches = Math.max(1, maxSearches);
 
-  // Segunda búsqueda si hay presupuesto
-  if (budgetUsdc >= SERVICE_COSTS.search * 2) {
+  for (let i = 0; i < numSearches; i++) {
     tasks.push({
       id: uuidv4(),
       service: 'search' as ServiceName,
-      input: `últimas noticias ${question}`,
-      reason: 'Búsqueda complementaria de noticias recientes',
+      input: SEARCH_VARIATIONS[i](question),
+      reason: i === 0 ? 'Búsqueda principal sobre la pregunta' : `Búsqueda complementaria ángulo ${i + 1}`,
       cost: SERVICE_COSTS.search,
       status: 'pending',
     });
   }
 
-  // Resumen si hay presupuesto suficiente
-  if (budgetUsdc >= SERVICE_COSTS.search * 2 + SERVICE_COSTS.summarize) {
+  // Resumen si queda presupuesto
+  const usedSoFar = numSearches * SERVICE_COSTS.search;
+  if (budgetUsdc - usedSoFar >= SERVICE_COSTS.summarize) {
     tasks.push({
       id: uuidv4(),
       service: 'summarize' as ServiceName,
@@ -63,8 +73,9 @@ Servicios disponibles:
 Presupuesto: ${budgetUsdc} USDC
 Pregunta de investigación: ${question}
 
-Planifica máximo 3 subtareas concretas para responder la pregunta. Mantén el costo total dentro del presupuesto.
-Prefiere "search" como herramienta primaria. Usa "summarize" solo si necesitas condensar contenido extenso.
+Presupuesto máximo de subtareas: ${Math.min(Math.floor(budgetUsdc / 0.01), 10)} subtareas (respetando el presupuesto de ${budgetUsdc} USDC).
+Planifica TODAS las subtareas que puedas dentro del presupuesto, hasta ese máximo. No limites artificialmente a 3.
+Prefiere "search" como herramienta primaria con ángulos distintos de la pregunta. Usa "summarize" solo al final si queda presupuesto.
 
 Responde SOLO con un array JSON válido — sin markdown, sin explicaciones:
 [
@@ -77,7 +88,7 @@ Responde SOLO con un array JSON válido — sin markdown, sin explicaciones:
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 512,
+      max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     });
 
@@ -92,8 +103,9 @@ Responde SOLO con un array JSON válido — sin markdown, sin explicaciones:
       parsed = match ? JSON.parse(match[0]) : [];
     }
 
+    const maxTasks = Math.min(Math.floor(budgetUsdc / 0.01), 10);
     const subtasks: Subtask[] = parsed
-      .slice(0, 3)
+      .slice(0, maxTasks)
       .filter((item) => item.service === 'search' || item.service === 'summarize')
       .map((item) => {
         const svc = item.service as 'search' | 'summarize';
